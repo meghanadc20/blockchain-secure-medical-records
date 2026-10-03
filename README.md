@@ -20,7 +20,7 @@ Medical files are **never** stored on the blockchain. The chain stores only pseu
 backend/      Express API (src/config, models, middleware, controllers, routes, services, utils)
 blockchain/   Solidity contract + deploy scripts
 frontend/     Public pages + patient/, doctor/, admin/ dashboards
-docs/         API.md, SETUP.md, TESTING.md
+docs/         API.md, DATABASE.md, SETUP.md
 ```
 
 ## Quick start
@@ -37,7 +37,7 @@ npm run dev               # http://localhost:5000
 ## Build progress
 
 - [x] Phase 1 — Project setup
-- [ ] Phase 2 — Database
+- [x] Phase 2 — Database
 - [ ] Phase 3 — Authentication
 - [ ] Phase 4 — Module 1: User, Doctor & Patient Management
 - [ ] Phase 5 — Module 2: Medical Records & Patient History

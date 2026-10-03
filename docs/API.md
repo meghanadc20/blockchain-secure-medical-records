@@ -29,7 +29,7 @@ Authenticated endpoints require `Authorization: Bearer <JWT>`.
 Public. Liveness check.
 
 ```json
-{ "success": true, "data": { "status": "ok", "environment": "development", "uptimeSeconds": 12,
+{ "success": true, "data": { "status": "ok", "database": "connected", "environment": "development", "uptimeSeconds": 12,
   "configLoaded": { "database": false, "auth": false, "storage": false, "blockchain": false } } }
 ```
 `configLoaded` reports only whether each group of variables is set — never their values.

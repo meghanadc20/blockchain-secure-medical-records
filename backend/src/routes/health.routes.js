@@ -1,6 +1,7 @@
 'use strict';
 const { Router } = require('express');
 const { envStatus, env } = require('../config/env');
+const { dbState } = require('../config/db');
 
 const router = Router();
 
@@ -10,6 +11,7 @@ router.get('/', (req, res) => {
     success: true,
     data: {
       status: 'ok',
+      database: dbState(),
       environment: env.nodeEnv,
       uptimeSeconds: Math.round(process.uptime()),
       configLoaded: envStatus(),

@@ -14,6 +14,7 @@ const env = {
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5000',
 
   mongoUri: process.env.MONGO_URI,
+  mongoDbName: process.env.MONGO_DB_NAME || 'medical_data_sharing',
 
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '2h',

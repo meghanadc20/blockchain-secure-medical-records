@@ -1,7 +1,7 @@
 # Setup
 
 ## Prerequisites
-- Node.js 18+ (20 LTS or 22 recommended) and npm
+- Node.js 22 LTS or newer and npm
 - Git
 - A MongoDB Atlas cluster (free tier) — Phase 2
 - A Supabase project with a **private** bucket named `medical-records` — Phase 6
