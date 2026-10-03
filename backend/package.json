@@ -1,0 +1,26 @@
+{
+  "name": "medical-data-sharing-backend",
+  "version": "0.1.0",
+  "description": "Express API for the Blockchain-Based Secure Medical Data Sharing System",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test tests/"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.5",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.10.4",
+    "multer": "^2.4.0"
+  }
+}
