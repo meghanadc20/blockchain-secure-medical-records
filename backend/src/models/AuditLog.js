@@ -10,7 +10,7 @@ const { ROLES, AUDIT_ACTIONS } = require('../utils/constants');
 const auditLogSchema = new Schema(
   {
     actorId: { type: Schema.Types.ObjectId, ref: 'User' }, // null for anonymous events (e.g. failed login)
-    actorRole: { type: String, enum: [...Object.values(ROLES), 'ANONYMOUS'], required: true },
+    actorRole: { type: String, enum: [...Object.values(ROLES), 'ANONYMOUS', 'SYSTEM'], required: true },
     action: { type: String, enum: AUDIT_ACTIONS, required: true },
     patientId: { type: Schema.Types.ObjectId, ref: 'User' },
     doctorId: { type: Schema.Types.ObjectId, ref: 'User' },

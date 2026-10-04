@@ -14,12 +14,18 @@
 <body data-role="DOCTOR" data-page="records" data-title="Authorized Records">
   <div id="app-root"><div class="app-loading"><div class="state" role="status"><div class="spinner" aria-hidden="true"></div>Loading…</div></div></div>
   <template id="page-content">
-    <div class="page-header"><div><h1>Authorized Records</h1><p>Records patients have shared with you.</p></div></div>
-    <div class="card"><div class="state"><div class="state-title">Not available yet</div><div>This section is delivered with Module 4 (sharing and access control). Nothing is shown here until it is built.</div></div></div>
+    <div class="page-header"><div><h1>Authorized records</h1><p>Records patients have shared with you. Each share is for one record and ends at its expiry time, or earlier if the patient revokes it.</p></div></div>
+    <div id="verify-alert" class="alert" hidden></div>
+    <div class="tabs" role="tablist" aria-label="Access status">
+      <button class="tab" role="tab" aria-selected="true" data-status="ACTIVE">Active<span class="count" data-count="ACTIVE">0</span></button>
+      <button class="tab" role="tab" aria-selected="false" data-status="EXPIRED">Expired<span class="count" data-count="EXPIRED">0</span></button>
+      <button class="tab" role="tab" aria-selected="false" data-status="REVOKED">Revoked<span class="count" data-count="REVOKED">0</span></button>
+    </div>
+    <div id="list" role="tabpanel"></div>
   </template>
   <script src="/js/api.js" defer></script>
   <script src="/js/ui.js" defer></script>
   <script src="/js/layout.js" defer></script>
-
+  <script src="/js/pages/doctor-records.js" defer></script>
 </body>
 </html>

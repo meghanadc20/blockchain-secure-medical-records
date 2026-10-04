@@ -219,6 +219,43 @@
       return null;
     },
 
+    /** Generic dialog. Returns { el, close, closed } — `closed` resolves when the dialog closes. */
+    dialog({ title, bodyHtml, wide = false }) {
+      const previous = document.activeElement;
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="dlg-title" style="${wide ? 'max-width:760px' : ''}">
+        <div class="card-header"><h2 id="dlg-title" style="font-size:1.2rem;margin:0">${UI.esc(title)}</h2>
+        <button type="button" class="btn btn-outline btn-sm" data-act="close" aria-label="Close">Close</button></div>
+        <div class="dlg-body">${bodyHtml}</div></div>`;
+      let resolveClosed;
+      const closed = new Promise((r) => { resolveClosed = r; });
+      const onKey = (e) => { if (e.key === 'Escape') close(); };
+      function close() {
+        backdrop.remove(); document.removeEventListener('keydown', onKey);
+        if (previous && previous.focus) previous.focus();
+        resolveClosed();
+      }
+      backdrop.addEventListener('click', (e) => { if (e.target === backdrop || e.target.closest('[data-act="close"]')) close(); });
+      document.addEventListener('keydown', onKey);
+      document.body.appendChild(backdrop);
+      backdrop.querySelector('[data-act="close"]').focus();
+      return { el: backdrop.querySelector('.dlg-body'), close, closed };
+    },
+
+    /** "in 3 hours", "2 days ago" */
+    relativeTime(date) {
+      const diff = new Date(date).getTime() - Date.now();
+      const abs = Math.abs(diff);
+      const units = [['day', 86400000], ['hour', 3600000], ['minute', 60000]];
+      const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+      for (const [u, ms] of units) if (abs >= ms) return rtf.format(Math.round(diff / ms), u);
+      return rtf.format(Math.round(diff / 1000), 'second');
+    },
+
+    /** Expiry presets for sharing (value = minutes). */
+    EXPIRY_PRESETS: [[60, '1 hour'], [1440, '24 hours'], [10080, '7 days'], [43200, '30 days'], ['custom', 'Custom date & time…']],
+
     /** Renders a simple data table. columns: [{ label, render(row) → HTML string }] */
     table(columns, rows, { caption } = {}) {
       return `<div class="table-wrap"><table class="table">${caption ? `<caption class="sr-only">${UI.esc(caption)}</caption>` : ''}

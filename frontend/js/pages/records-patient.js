@@ -51,11 +51,13 @@ Layout.ready.then(() => {
         <dt>Date</dt><dd>${UI.formatDate(r.createdAt, true)}</dd>
         <dt>Uploaded by</dt><dd>${UI.esc(r.uploadedBy.name || '—')}</dd>
         <dt>File</dt><dd>${r.hasFile ? `${UI.esc(r.fileName || 'Stored file')} · ${UI.formatBytes(r.fileSize)} · <span class="badge badge-verified" style="text-transform:none">Encrypted at rest</span>` : '<span class="muted">No file attached</span>'}</dd>
-        <dt>Access</dt><dd><span class="muted">Shared access is managed with Module 4</span></dd>
+        <dt>Access</dt><dd>${r.activeShares ? `<span class="badge badge-active" style="text-transform:none">${r.activeShares} doctor${r.activeShares > 1 ? 's' : ''} with active access</span>` : '<span class="muted">Not shared</span>'}</dd>
         <dt>Integrity</dt><dd><span class="muted">Not yet verified (Module 6)</span></dd>
       </dl>
       <div class="actions">
         ${r.hasFile ? `<button class="btn btn-primary btn-sm" data-view="${r.id}">View</button><button class="btn btn-outline btn-sm" data-download="${r.id}">Download</button>` : ''}
+        <button class="btn btn-secondary btn-sm" data-share="${r.id}">Share</button>
+        <button class="btn btn-outline btn-sm" data-access="${r.id}">Manage access</button>
         <button class="btn btn-outline btn-sm" data-edit="${r.id}">Edit details</button>
       </div>
     </article>`;
@@ -81,6 +83,10 @@ Layout.ready.then(() => {
     if (view) { UI.openFile(view.dataset.view, { inline: true }); return; }
     const dl = e.target.closest('[data-download]');
     if (dl) { UI.setLoading(dl, true, 'Decrypting…'); await UI.openFile(dl.dataset.download); UI.setLoading(dl, false); return; }
+    const share = e.target.closest('[data-share]');
+    if (share) { shareRecord(items.find((x) => x.id === share.dataset.share)); return; }
+    const acc = e.target.closest('[data-access]');
+    if (acc) { manageAccess(items.find((x) => x.id === acc.dataset.access)); return; }
     const btn = e.target.closest('[data-edit]');
     if (!btn) return;
     const r = items.find((x) => x.id === btn.dataset.edit);
@@ -99,4 +105,78 @@ Layout.ready.then(() => {
   q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(load, 300); });
   typeSel.addEventListener('change', load);
   load();
+
+  // ---------- sharing (Module 4) ----------
+  async function shareRecord(r) {
+    let doctors;
+    try { doctors = (await API.get('/relations/patient?status=APPROVED&limit=100')).items; } catch (err) { UI.toast(err.message, 'error'); return; }
+    if (!doctors.length) {
+      await UI.confirm({ title: 'No authorized doctors', message: 'Approve a doctor’s access request first (Access Requests page). Then you can share individual records with them.', confirmLabel: 'OK', hideCancel: true });
+      return;
+    }
+    const docOpts = doctors.map((d) => `<option value="${d.doctor.id}">Dr. ${UI.esc(d.doctor.name)} — ${UI.esc(d.doctor.specialization || '')}</option>`).join('');
+    const presetOpts = UI.EXPIRY_PRESETS.map(([v, l]) => `<option value="${v}" ${v === 1440 ? 'selected' : ''}>${l}</option>`).join('');
+    const saved = await UI.formModal({
+      title: `Share “${r.title}”`,
+      confirmLabel: 'Grant access',
+      bodyHtml: `<div class="form-group"><label for="s-doc">Doctor</label><select class="form-control" id="s-doc" name="doctorId"><option value="">Select a doctor…</option>${docOpts}</select><div class="field-error" data-error-for="doctorId"></div></div>
+        <div class="form-group"><label for="s-preset">Access expires after</label><select class="form-control" id="s-preset" name="preset">${presetOpts}</select></div>
+        <div class="form-group" id="s-custom-wrap" hidden><label for="s-custom">Expires at</label><input class="form-control" id="s-custom" name="custom" type="datetime-local"></div>
+        <div class="field-error" data-error-for="expiresAt"></div>
+        <p class="form-hint">Only this record is shared, only with this doctor, and access ends automatically at the expiry time. You can revoke it earlier at any time.</p>`,
+      onSubmit: async (v) => {
+        const errs = [];
+        if (!v.doctorId) errs.push({ field: 'doctorId', message: 'Select a doctor' });
+        let expiresAt;
+        if (v.preset === 'custom') {
+          if (!v.custom) errs.push({ field: 'expiresAt', message: 'Choose the expiry date and time' });
+          else expiresAt = new Date(v.custom).toISOString();
+        } else expiresAt = new Date(Date.now() + Number(v.preset) * 60000).toISOString();
+        if (errs.length) { const e = new Error('Please correct the highlighted fields.'); e.details = errs; throw e; }
+        return API.post('/permissions', { recordId: r.id, doctorId: v.doctorId, expiresAt });
+      },
+    });
+    if (saved) { UI.toast(`Shared with Dr. ${saved.permission.doctor.name} until ${UI.formatDate(saved.permission.expiresAt, true)}.`); load(); }
+  }
+  // Show the custom date field when "Custom" is chosen (modal is created dynamically).
+  document.addEventListener('change', (e) => {
+    if (e.target && e.target.id === 's-preset') {
+      const wrap = document.getElementById('s-custom-wrap');
+      wrap.hidden = e.target.value !== 'custom';
+      if (!wrap.hidden) {
+        const min = new Date(Date.now() + 10 * 60000); min.setSeconds(0, 0);
+        const local = new Date(min.getTime() - min.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        const input = document.getElementById('s-custom'); input.min = local; if (!input.value) input.value = local;
+      }
+    }
+  });
+
+  async function manageAccess(r) {
+    const dlg = UI.dialog({ title: `Access to “${r.title}”`, bodyHtml: UI.state('loading', 'Loading…'), wide: true });
+    async function render() {
+      try {
+        const data = await API.get(`/permissions?recordId=${r.id}&limit=100`);
+        dlg.el.innerHTML = data.items.length ? UI.table([
+          { label: 'Doctor', render: (p) => `<strong>Dr. ${UI.esc(p.doctor.name)}</strong><span class="cell-sub">${UI.esc(p.doctor.email)}</span>` },
+          { label: 'Granted', render: (p) => UI.formatDate(p.grantedAt, true) },
+          { label: 'Expires', render: (p) => `${UI.formatDate(p.expiresAt, true)}<span class="cell-sub">${p.status === 'ACTIVE' ? UI.relativeTime(p.expiresAt) : ''}</span>` },
+          { label: 'Status', render: (p) => `${UI.badge(p.status)}${p.revokedAt ? `<span class="cell-sub">Revoked ${UI.formatDate(p.revokedAt, true)}</span>` : ''}` },
+          { label: 'Action', render: (p) => (p.status === 'ACTIVE' ? `<button class="btn btn-danger btn-sm" data-revoke="${p.id}">Revoke</button>` : '<span class="muted">—</span>') },
+        ], data.items, { caption: 'Access history for this record' })
+          : UI.state('empty', 'Not shared yet', 'Use “Share” to give an authorized doctor time-limited access.');
+      } catch (err) { dlg.el.innerHTML = UI.state('error', 'Could not load access', err.message); }
+    }
+    dlg.el.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-revoke]');
+      if (!b) return;
+      const { confirmed } = await UI.confirm({ title: 'Revoke access?', message: 'The doctor will be unable to open this record from their next request.', confirmLabel: 'Revoke', danger: true });
+      if (!confirmed) return;
+      try { await API.patch(`/permissions/${b.dataset.revoke}/revoke`); UI.toast('Access revoked.'); } catch (err) { UI.toast(err.message, 'error'); }
+      render();
+    });
+    render();
+    await dlg.closed;
+    load();
+  }
 });
+

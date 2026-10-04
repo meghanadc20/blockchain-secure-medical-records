@@ -12,13 +12,14 @@ const AuditLog = require('../models/AuditLog');
  * @param {*} [p.patientId] @param {*} [p.doctorId] @param {*} [p.recordId]
  * @param {string} [p.blockchainTransactionHash]
  * @param {object} [p.metadata]                must not contain medical content
+ * @param {boolean} [p.system]                 true for automatic events (e.g. scheduled expiry)
  */
-async function logAudit({ req, actor, action, patientId, doctorId, recordId, blockchainTransactionHash, metadata = {} }) {
+async function logAudit({ req, actor, action, patientId, doctorId, recordId, blockchainTransactionHash, metadata = {}, system = false }) {
   const who = actor || (req && req.user) || null;
   try {
     return await AuditLog.create({
       actorId: who ? who._id : undefined,
-      actorRole: who ? who.role : 'ANONYMOUS',
+      actorRole: who ? who.role : (system ? 'SYSTEM' : 'ANONYMOUS'),
       action,
       patientId,
       doctorId,

@@ -22,13 +22,14 @@ Layout.ready.then(async ({ user }) => {
     }
     statsEl.innerHTML = UI.state('loading', 'Loading…');
     try {
-      const [approved, pending] = await Promise.all([
+      const [approved, pending, shared] = await Promise.all([
         API.get('/relations/doctor?status=APPROVED&limit=1'),
         API.get('/relations/doctor?status=PENDING&limit=1'),
+        p.verificationStatus === 'APPROVED' ? API.get('/permissions/doctor?status=ACTIVE&limit=1') : Promise.resolve({ total: 0 }),
       ]);
       statsEl.innerHTML = statCard('Patients who approved you', approved.total, '/doctor/patients')
         + statCard('Requests awaiting patients', pending.total, '/doctor/access-requests')
-        + `<div class="card stat"><span class="stat-label">Verification</span><span style="margin-top:6px">${UI.badge(p.verificationStatus)}</span></div>`;
+        + statCard('Records shared with you (active)', shared.total, '/doctor/records');
     } catch (err) { statsEl.innerHTML = UI.state('error', 'Could not load summary', err.message); }
   } else {
     statsEl.innerHTML = UI.state('loading', 'Loading…');

@@ -2,6 +2,7 @@
 const { env, missingVars } = require('./src/config/env');
 const { connectDB, disconnectDB } = require('./src/config/db');
 const { createApp } = require('./src/app');
+const { startExpirySweep, stopExpirySweep } = require('./src/services/permission.service');
 
 async function start() {
   const missing = missingVars();
@@ -12,6 +13,8 @@ async function start() {
 
   await connectDB();
 
+  startExpirySweep(); // GRANTED permissions past expiresAt → EXPIRED (access is also checked live)
+
   const app = createApp();
   const server = app.listen(env.port, () => {
     console.log(`[server] Listening on http://localhost:${env.port} (${env.nodeEnv})`);
@@ -19,6 +22,7 @@ async function start() {
 
   const shutdown = (signal) => {
     console.log(`[server] ${signal} received, shutting down`);
+    stopExpirySweep();
     server.close(async () => {
       await disconnectDB();
       process.exit(0);

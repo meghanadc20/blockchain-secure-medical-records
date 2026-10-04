@@ -20,7 +20,7 @@ router.post('/', patientOrVerifiedDoctor, uploadSingleFile, ctrl.upload);
 
 // Patient: own records (metadata)
 router.get('/', authorize(ROLES.PATIENT), ctrl.listOwn);
-router.get('/:recordId', authorize(ROLES.PATIENT), validateId('recordId'), ctrl.getOwn);
+router.get('/:recordId', patientOrVerifiedDoctor, validateId('recordId'), ctrl.getOwn);
 router.patch('/:recordId', authorize(ROLES.PATIENT), validateId('recordId'), ctrl.updateOwn);
 
 // Controlled file retrieval (access decided by recordAccess.service)

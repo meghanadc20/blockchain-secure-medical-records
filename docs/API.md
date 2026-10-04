@@ -188,7 +188,7 @@ Fields: `file` (PDF/JPEG/PNG, ≤10 MB — the real content is checked by magic 
 
 ### `GET /api/records/:recordId/file?disposition=attachment|inline`
 Controlled retrieval: access check → download ciphertext → decrypt (the GCM auth tag rejects any modified ciphertext) → stream with `Cache-Control: no-store`.
-- Owning patient: allowed. Other patients: `404`. Doctors: `403 PERMISSION_DENIED` until record permissions exist (Module 4). Admins: `403`.
+- Owning patient: allowed. Other patients: `404`. Doctors: only with a live record permission (see Module 4) — otherwise `403 PERMISSION_DENIED | PERMISSION_EXPIRED | PERMISSION_REVOKED | DOCTOR_NOT_VERIFIED`. Admins: `403`.
 - `404 FILE_NOT_FOUND` if the record has no file or the object is missing · `409 FILE_INTEGRITY_FAILED` if the stored ciphertext was altered (audited `TAMPER_DETECTED`) · `502 STORAGE_ERROR`.
 - Successful reads audited `RECORD_VIEW` (`metadata.type = FILE`).
 
@@ -197,3 +197,29 @@ Controlled retrieval: access check → download ciphertext → decrypt (the GCM 
 npm run storage:setup   # creates/enforces the private bucket (SUPABASE_BUCKET), 11 MB limit, octet-stream only
 ```
 Tests use a separate `medical-records-test` bucket that is created and deleted by the test run.
+
+---
+
+## Record sharing & access control (Module 4)
+
+A doctor can read a patient's record (metadata via `GET /api/records/:id`, file via `GET /api/records/:id/file`) **only when all hold**:
+1. the doctor is verified (`APPROVED` by the admin),
+2. the doctor–patient relationship is `APPROVED`,
+3. a permission for that record and doctor has status `GRANTED`,
+4. `expiresAt` is in the future.
+
+Checks run on every request, so revocation and expiry take effect immediately. A `GRANTED` permission found past its expiry is marked `EXPIRED` at that moment (audited `ACCESS_EXPIRED`, `detectedBy: ACCESS_CHECK`); a background sweep every 60 s does the same for idle permissions (`actorRole: SYSTEM`, `detectedBy: SWEEP`). Revoking the doctor–patient relationship revokes all of that doctor's record permissions for the patient.
+
+Doctor-to-doctor sharing is patient-mediated: each doctor needs their own approved relationship and their own grant.
+
+Permission view: `{ id, status: ACTIVE|EXPIRED|REVOKED, storedStatus: GRANTED|EXPIRED|REVOKED, grantedAt, expiresAt, revokedAt, blockchainTransactionHash, revokeTransactionHash, record: { id, title, recordType, hasFile, fileName, createdAt }, doctor: { id, name, email }, patient: { id, name, email } }`
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| POST | `/api/permissions` | Owning patient | Body `{ recordId, doctorId, expiresAt }`; expiry 5 min – 1 year ahead. `201`. `404 RECORD_NOT_FOUND / DOCTOR_NOT_FOUND`, `409 DOCTOR_NOT_VERIFIED / RELATION_NOT_APPROVED / ALREADY_GRANTED`, `400 VALIDATION_ERROR`. Audited `ACCESS_GRANTED` (`scope: RECORD`) |
+| PATCH | `/api/permissions/:permissionId/revoke` | Owning patient | `GRANTED → REVOKED`. `409 INVALID_STATUS_TRANSITION` if already revoked/expired; another patient's → `404`. Audited `ACCESS_REVOKED` |
+| GET | `/api/permissions?recordId=&doctorId=&status=ACTIVE\|EXPIRED\|REVOKED` | Patient | Own grants, newest first |
+| GET | `/api/permissions/doctor?status=` | Verified doctor | Records shared with this doctor (patients with an APPROVED relationship only) |
+
+`GET /api/records` (patient) now also returns `activeShares` per record.
+Denied reads are audited `ACCESS_DENIED` with `reason` = `PERMISSION_DENIED | PERMISSION_EXPIRED | PERMISSION_REVOKED | NOT_RECORD_OWNER`.

@@ -37,13 +37,24 @@ async function listOwn(req, res) {
     MedicalRecord.find(filter).sort({ createdAt: -1 }).skip(pg.skip).limit(pg.limit).populate('uploadedBy', 'name role').lean(),
     MedicalRecord.countDocuments(filter),
   ]);
-  res.json({ success: true, data: paginated(items.map((r) => toRecordView(r)), total, pg) });
+  // Number of doctors with ACTIVE (granted, unexpired) access per record — shown on record cards.
+  const AccessPermission = require('../models/AccessPermission');
+  const active = await AccessPermission.aggregate([
+    { $match: { recordId: { $in: items.map((r) => r._id) }, status: 'GRANTED', expiresAt: { $gt: new Date() } } },
+    { $group: { _id: '$recordId', n: { $sum: 1 } } },
+  ]);
+  const counts = new Map(active.map((a) => [String(a._id), a.n]));
+  res.json({ success: true, data: paginated(items.map((r) => ({ ...toRecordView(r), activeShares: counts.get(String(r._id)) || 0 })), total, pg) });
 }
 
-/** GET /api/records/:recordId — metadata of an own record. */
+/** GET /api/records/:recordId — metadata: owning patient, or a doctor with a live permission. */
 async function getOwn(req, res) {
-  const rec = await findOwnRecordOr404(req);
-  res.json({ success: true, data: { record: toRecordView(rec) } });
+  // loadReadableRecord is required lazily to avoid a circular import at module load.
+  const { loadReadableRecord: load } = require('../services/recordAccess.service');
+  const { record, permission } = await load(req, req.params.recordId);
+  const view = toRecordView(record);
+  if (permission) view.access = { permissionId: String(permission._id), expiresAt: permission.expiresAt };
+  res.json({ success: true, data: { record: view } });
 }
 
 /** PATCH /api/records/:recordId — edit title / description / recordType of an own record. File fields are immutable. */
@@ -174,7 +185,7 @@ async function upload(req, res) {
  * Controlled retrieval: access check → download ciphertext → decrypt (GCM auth tag verifies it) → stream.
  */
 async function downloadFile(req, res) {
-  const rec = await loadReadableRecord(req, req.params.recordId);
+  const { record: rec } = await loadReadableRecord(req, req.params.recordId);
   if (!rec.storagePath) throw ApiError.notFound('This record has no file attached.', 'FILE_NOT_FOUND');
 
   const encrypted = await storage.download(rec.storagePath);
