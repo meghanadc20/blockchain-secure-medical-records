@@ -170,3 +170,30 @@ Consultations are append-only: there are no update or delete endpoints. Correcti
 
 ### `GET /api/history?type=ALL|RECORD|CONSULTATION&from=YYYY-MM-DD&to=YYYY-MM-DD`
 Patient only (own data). Returns `{ items: [{ kind: 'RECORD' | 'CONSULTATION', date, record? , consultation? }], counts: { records, consultations }, truncated }`, newest first (records by upload date, consultations by consultation date; `to` is inclusive). Max 500 items.
+
+---
+
+## Secure file storage (Module 3)
+
+**Flow on upload:** original file → SHA-256 fingerprint (stored as `sha256Hash`) → AES-256-GCM encryption with a fresh random IV (IV + auth tag stored server-side only) → ciphertext uploaded to the **private** Supabase bucket at `{patientId}/{recordId}/encrypted-file` → metadata saved in MongoDB.
+If storage fails nothing is saved; if the database write fails the uploaded object is deleted.
+Hashing is an integrity fingerprint, not encryption. Nothing is stored on a blockchain in this module.
+
+### `POST /api/records` (multipart/form-data)
+Fields: `file` (PDF/JPEG/PNG, ≤10 MB — the real content is checked by magic bytes), `title` (2–150), `recordType`, `description?` (≤2000), `patientId` (required for doctors).
+- Patient: uploads for themselves (a different `patientId` → `403`).
+- Doctor: must be verified **and** have an APPROVED relationship with `patientId`. The record belongs to the patient; the doctor still needs a record permission (Module 4) to open it.
+
+→ `201 { record }` · `400 FILE_REQUIRED | UNSUPPORTED_FILE_TYPE | FILE_CONTENT_MISMATCH | VALIDATION_ERROR | INVALID_UPLOAD` · `413 FILE_TOO_LARGE` · `403 PERMISSION_DENIED | DOCTOR_NOT_VERIFIED` · `502 STORAGE_ERROR`. Audited `RECORD_UPLOAD` (type and size only — no file name or content).
+
+### `GET /api/records/:recordId/file?disposition=attachment|inline`
+Controlled retrieval: access check → download ciphertext → decrypt (the GCM auth tag rejects any modified ciphertext) → stream with `Cache-Control: no-store`.
+- Owning patient: allowed. Other patients: `404`. Doctors: `403 PERMISSION_DENIED` until record permissions exist (Module 4). Admins: `403`.
+- `404 FILE_NOT_FOUND` if the record has no file or the object is missing · `409 FILE_INTEGRITY_FAILED` if the stored ciphertext was altered (audited `TAMPER_DETECTED`) · `502 STORAGE_ERROR`.
+- Successful reads audited `RECORD_VIEW` (`metadata.type = FILE`).
+
+### Storage setup
+```bash
+npm run storage:setup   # creates/enforces the private bucket (SUPABASE_BUCKET), 11 MB limit, octet-stream only
+```
+Tests use a separate `medical-records-test` bucket that is created and deleted by the test run.

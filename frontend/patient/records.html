@@ -15,7 +15,20 @@
   <div id="app-root"><div class="app-loading"><div class="state" role="status"><div class="spinner" aria-hidden="true"></div>Loading…</div></div></div>
   <template id="page-content">
     <div class="page-header"><div><h1>Medical records</h1><p>Your uploaded reports and documents.</p></div></div>
-    <div class="alert alert-info" role="status">Uploading files is enabled together with encrypted cloud storage (Module 3). Records listed here can already be renamed and described.</div>
+    <section class="card" aria-labelledby="up-title" style="margin-bottom:20px">
+      <h2 class="card-title" id="up-title" style="margin-bottom:4px">Upload a record</h2>
+      <p class="form-hint" style="margin:0 0 14px">PDF, JPEG or PNG, up to 10 MB. Files are encrypted before they are stored and are never public.</p>
+      <div id="form-alert" class="alert" hidden></div>
+      <form id="upload-form" method="post" action="#" enctype="multipart/form-data" novalidate>
+        <div class="form-row">
+          <div class="form-group"><label for="u-title">Title</label><input class="form-control" id="u-title" name="title" maxlength="150" required placeholder="e.g. Blood test – March"><div class="field-error" data-error-for="title"></div></div>
+          <div class="form-group"><label for="u-type">Record type</label><select class="form-control" id="u-type" name="recordType" required></select><div class="field-error" data-error-for="recordType"></div></div>
+        </div>
+        <div class="form-group"><label for="u-desc">Description <span class="muted">(optional)</span></label><textarea class="form-control" id="u-desc" name="description" rows="2" maxlength="2000"></textarea><div class="field-error" data-error-for="description"></div></div>
+        <div class="form-group"><label for="u-file">File</label><input class="form-control" id="u-file" name="file" type="file" accept="application/pdf,image/png,image/jpeg" required><div class="field-error" data-error-for="file"></div></div>
+        <button class="btn btn-primary" type="submit" disabled data-requires-js>Upload securely</button>
+      </form>
+    </section>
     <div class="toolbar">
       <div class="filter-row">
         <label class="sr-only" for="q">Search records</label><input class="form-control" id="q" type="search" placeholder="Search by title…" maxlength="100">

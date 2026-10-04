@@ -61,7 +61,30 @@
     return json.data;
   }
 
+  /** Authenticated binary download (files cannot use plain links because the JWT is sent in a header). */
+  async function blob(path) {
+    const headers = {};
+    if (Session.token) headers.Authorization = `Bearer ${Session.token}`;
+    let res;
+    try { res = await fetch(`/api${path}`, { headers }); } catch {
+      throw new ApiError(0, 'NETWORK_ERROR', `Cannot reach the API at ${window.location.origin}.`);
+    }
+    if (!res.ok) {
+      let err = {};
+      try { err = (await res.json()).error || {}; } catch { /* not JSON */ }
+      const apiErr = new ApiError(res.status, err.code || 'UNKNOWN_ERROR', err.message || 'The file could not be retrieved.');
+      if (res.status === 401 && SESSION_ERRORS.includes(apiErr.code)) {
+        Session.clear(); window.location.replace('/login?reason=expired');
+      }
+      throw apiErr;
+    }
+    const cd = res.headers.get('content-disposition') || '';
+    const m = /filename\*=UTF-8''([^;]+)/.exec(cd) || /filename="([^"]+)"/.exec(cd);
+    return { blob: await res.blob(), filename: m ? decodeURIComponent(m[1]) : 'medical-record' };
+  }
+
   window.API = {
+    blob,
     Session,
     ApiError,
     get: (p, o) => request('GET', p, undefined, o),

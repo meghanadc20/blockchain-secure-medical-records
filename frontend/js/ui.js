@@ -195,6 +195,30 @@
     /** Multi-line text → safe HTML with line breaks. */
     multiline(text) { return UI.esc(text).replace(/\n/g, '<br>'); },
 
+    /** Downloads or opens (in a new tab) a protected file. */
+    async openFile(recordId, { inline = false } = {}) {
+      const win = inline ? window.open('', '_blank') : null; // open synchronously to avoid popup blockers
+      try {
+        const { blob, filename } = await API.blob(`/records/${recordId}/file${inline ? '?disposition=inline' : ''}`);
+        const url = URL.createObjectURL(blob);
+        if (win) { win.location.href = url; } else {
+          const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      } catch (err) {
+        if (win) win.close();
+        UI.toast(err.message, 'error');
+      }
+    },
+
+    /** Client-side pre-check (the server re-checks type, real content and size). */
+    checkUploadFile(file) {
+      if (!file) return 'Choose a file to upload.';
+      if (!['application/pdf', 'image/png', 'image/jpeg'].includes(file.type)) return 'Only PDF, JPEG and PNG files are allowed.';
+      if (file.size > 10 * 1024 * 1024) return 'File is too large. The maximum size is 10 MB.';
+      return null;
+    },
+
     /** Renders a simple data table. columns: [{ label, render(row) → HTML string }] */
     table(columns, rows, { caption } = {}) {
       return `<div class="table-wrap"><table class="table">${caption ? `<caption class="sr-only">${UI.esc(caption)}</caption>` : ''}

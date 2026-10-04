@@ -27,7 +27,15 @@ npm run seed:admin
 ```
 The admin logs in on the normal `/login` page and is redirected to the admin dashboard. There is no public admin link or registration.
 
-## 3. Run
+## 3. Secure file storage (Supabase)
+In `.env` set `SUPABASE_URL` (project URL), `SUPABASE_SERVICE_ROLE_KEY` (the **secret** server key — never put it in frontend code) and `FILE_ENCRYPTION_KEY` (64 hex chars). Then:
+```bash
+cd backend
+npm run storage:setup
+```
+Back up `FILE_ENCRYPTION_KEY` safely — encrypted files cannot be decrypted without it.
+
+## 3b. Run
 ```bash
 cd backend
 npm install

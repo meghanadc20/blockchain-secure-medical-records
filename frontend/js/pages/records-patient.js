@@ -5,7 +5,43 @@ Layout.ready.then(() => {
   const typeSel = document.getElementById('type');
   let timer; let items = [];
 
-  typeSel.innerHTML += Object.entries(UI.RECORD_TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+  const typeOptions = Object.entries(UI.RECORD_TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+  typeSel.innerHTML += typeOptions;
+
+  // ---------- upload ----------
+  const upForm = document.getElementById('upload-form');
+  const upAlert = document.getElementById('form-alert');
+  const upBtn = upForm.querySelector('button[type="submit"]');
+  upForm.recordType.innerHTML = `<option value="">Select a type…</option>${typeOptions}`;
+  upForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    UI.hideAlert(upAlert); UI.clearFieldErrors(upForm);
+    const file = upForm.file.files[0];
+    const local = [];
+    if (!upForm.title.value.trim()) local.push({ field: 'title', message: 'Title is required' });
+    if (!upForm.recordType.value) local.push({ field: 'recordType', message: 'Record type is required' });
+    const fileErr = UI.checkUploadFile(file);
+    if (fileErr) local.push({ field: 'file', message: fileErr });
+    if (local.length) { UI.showFieldErrors(upForm, local); return; }
+
+    const fd = new FormData();
+    fd.append('title', upForm.title.value.trim());
+    fd.append('recordType', upForm.recordType.value);
+    if (upForm.description.value.trim()) fd.append('description', upForm.description.value.trim());
+    fd.append('file', file, file.name);
+    UI.setLoading(upBtn, true, 'Encrypting & uploading…');
+    try {
+      const data = await API.upload('/records', fd);
+      upForm.reset();
+      UI.showAlert(upAlert, 'success', `“${data.record.title}” was encrypted and stored securely.`);
+      await load();
+    } catch (err) {
+      if (err.details) UI.showFieldErrors(upForm, err.details);
+      if (['UNSUPPORTED_FILE_TYPE', 'FILE_CONTENT_MISMATCH', 'FILE_TOO_LARGE', 'FILE_REQUIRED'].includes(err.code)) UI.showFieldErrors(upForm, [{ field: 'file', message: err.message }]);
+      UI.showAlert(upAlert, 'error', err.message);
+    } finally { UI.setLoading(upBtn, false); }
+  });
+  upBtn.disabled = false;
 
   function card(r) {
     return `<article class="card record-card">
@@ -14,11 +50,14 @@ Layout.ready.then(() => {
       <dl class="record-meta">
         <dt>Date</dt><dd>${UI.formatDate(r.createdAt, true)}</dd>
         <dt>Uploaded by</dt><dd>${UI.esc(r.uploadedBy.name || '—')}</dd>
-        <dt>File</dt><dd>${r.hasFile ? `${UI.esc(r.fileName || 'Stored file')} · ${UI.formatBytes(r.fileSize)}` : '<span class="muted">No file attached</span>'}</dd>
+        <dt>File</dt><dd>${r.hasFile ? `${UI.esc(r.fileName || 'Stored file')} · ${UI.formatBytes(r.fileSize)} · <span class="badge badge-verified" style="text-transform:none">Encrypted at rest</span>` : '<span class="muted">No file attached</span>'}</dd>
         <dt>Access</dt><dd><span class="muted">Shared access is managed with Module 4</span></dd>
         <dt>Integrity</dt><dd><span class="muted">Not yet verified (Module 6)</span></dd>
       </dl>
-      <div class="actions"><button class="btn btn-outline btn-sm" data-edit="${r.id}">Edit details</button></div>
+      <div class="actions">
+        ${r.hasFile ? `<button class="btn btn-primary btn-sm" data-view="${r.id}">View</button><button class="btn btn-outline btn-sm" data-download="${r.id}">Download</button>` : ''}
+        <button class="btn btn-outline btn-sm" data-edit="${r.id}">Edit details</button>
+      </div>
     </article>`;
   }
 
@@ -38,6 +77,10 @@ Layout.ready.then(() => {
   }
 
   listEl.addEventListener('click', async (e) => {
+    const view = e.target.closest('[data-view]');
+    if (view) { UI.openFile(view.dataset.view, { inline: true }); return; }
+    const dl = e.target.closest('[data-download]');
+    if (dl) { UI.setLoading(dl, true, 'Decrypting…'); await UI.openFile(dl.dataset.download); UI.setLoading(dl, false); return; }
     const btn = e.target.closest('[data-edit]');
     if (!btn) return;
     const r = items.find((x) => x.id === btn.dataset.edit);
