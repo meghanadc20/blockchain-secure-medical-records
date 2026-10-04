@@ -35,8 +35,14 @@
       res = await fetch(`/api${path}`, {
         method, headers, body: body === undefined ? undefined : (isForm ? body : JSON.stringify(body)),
       });
-    } catch {
-      throw new ApiError(0, 'NETWORK_ERROR', 'Cannot reach the server. Check your connection and try again.');
+    } catch (networkErr) {
+      // The request never reached the API (server stopped/restarting, wrong origin, or blocked by an extension).
+      const target = `${window.location.origin}/api${path}`;
+      console.error(`[api] ${method} ${target} failed before reaching the server:`, networkErr);
+      const hint = window.location.protocol === 'file:'
+        ? 'This page was opened as a file. Start the backend and open the app at http://localhost:5000/login.'
+        : `Cannot reach the API at ${window.location.origin}. Make sure the backend is running and that you opened the app from the backend's address (e.g. http://localhost:5000/login).`;
+      throw new ApiError(0, 'NETWORK_ERROR', hint);
     }
 
     let json = null;
