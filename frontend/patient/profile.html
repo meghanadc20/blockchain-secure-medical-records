@@ -32,10 +32,26 @@
         <p class="form-hint" style="margin-top:16px">Your email address identifies your account and cannot be changed here.</p>
       </section>
     </div>
+    <section class="card" aria-labelledby="wallet-title" style="margin-top:20px">
+      <div class="card-header"><h2 class="card-title" id="wallet-title">Blockchain wallet</h2><span id="wallet-badge"></span></div>
+      <p class="muted" style="margin-top:-6px">Sharing and revoking access to your records is signed by <strong>you</strong> in MetaMask and recorded on the project’s <strong>local Ganache test blockchain</strong>. No real money is used. Medical files and details never go on the blockchain — only anonymous identifiers, file fingerprints and permissions.</p>
+      <div id="wallet-alert" class="alert" hidden></div>
+      <dl class="kv" id="wallet-info" style="margin-bottom:16px"></dl>
+      <button class="btn btn-primary" id="wallet-link" type="button" disabled data-requires-js>Connect MetaMask &amp; link wallet</button>
+      <details style="margin-top:16px"><summary>First-time MetaMask setup</summary>
+        <ol class="muted" style="margin:10px 0 0;padding-left:20px">
+          <li>Make sure the local chain is running (<code>npm run chain</code> in the backend folder).</li>
+          <li>Click the button above. MetaMask asks to add or switch to <em>Ganache (local test network)</em> — approve it.</li>
+          <li>Sign the message. Signing is free and proves the wallet is yours; your wallet then receives a little local <em>test</em> ether to pay for transaction fees.</li>
+        </ol></details>
+    </section>
   </template>
   <script src="/js/api.js" defer></script>
   <script src="/js/ui.js" defer></script>
   <script src="/js/layout.js" defer></script>
+  <script src="/js/vendor/ethers.umd.min.js" defer></script>
+  <script src="/js/wallet.js" defer></script>
   <script src="/js/pages/profile.js" defer></script>
+  <script src="/js/pages/profile-wallet.js" defer></script>
 </body>
 </html>

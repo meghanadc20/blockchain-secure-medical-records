@@ -22,3 +22,4 @@ Thumbs.db
 # Local uploads / temp
 tmp/
 uploads/
+blockchain/.ganache-db/

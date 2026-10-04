@@ -12,7 +12,7 @@ const { ROLES } = require('../utils/constants');
 const { logAudit } = require('./audit.service');
 const { checkDoctorRecordAccess } = require('./permission.service');
 
-const STATUS_FOR = { PERMISSION_DENIED: 403, PERMISSION_EXPIRED: 403, PERMISSION_REVOKED: 403 };
+const STATUS_FOR = { PERMISSION_DENIED: 403, PERMISSION_EXPIRED: 403, PERMISSION_REVOKED: 403, PERMISSION_NOT_ON_CHAIN: 403, BLOCKCHAIN_PERMISSION_DENIED: 403 };
 
 /** Loads the record (with encryption fields) and checks read access. Returns { record, permission? }. */
 async function loadReadableRecord(req, recordId) {
@@ -26,7 +26,13 @@ async function loadReadableRecord(req, recordId) {
   }
 
   if (req.user.role === ROLES.DOCTOR) {
-    const decision = await checkDoctorRecordAccess(req.user._id, rec, { req });
+    let decision;
+    try {
+      decision = await checkDoctorRecordAccess(req.user._id, rec, { req });
+    } catch (err) {
+      await logAudit({ req, action: 'ACCESS_DENIED', recordId: rec._id, patientId: rec.patientId, doctorId: req.user._id, metadata: { reason: err.code || 'ERROR', operation: 'READ_RECORD' } });
+      throw err; // e.g. 503 BLOCKCHAIN_UNAVAILABLE — fail closed
+    }
     if (decision.allowed) return { record: rec, permission: decision.permission };
     await logAudit({
       req, action: 'ACCESS_DENIED', recordId: rec._id, patientId: rec.patientId, doctorId: req.user._id,

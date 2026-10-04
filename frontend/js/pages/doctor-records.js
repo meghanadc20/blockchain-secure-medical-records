@@ -31,7 +31,7 @@ Layout.ready.then(({ user }) => {
         { label: 'Patient', render: (p) => UI.esc(p.patient.name) },
         { label: 'Granted', render: (p) => UI.formatDate(p.grantedAt, true) },
         { label: 'Expires', render: (p) => `${UI.formatDate(p.expiresAt, true)}<span class="cell-sub">${p.status === 'ACTIVE' ? UI.relativeTime(p.expiresAt) : ''}</span>` },
-        { label: 'Status', render: (p) => UI.badge(p.status) },
+        { label: 'Status', render: (p) => `${UI.badge(p.status)}<div style="margin-top:4px">${UI.chainBadge(p.blockchainTransactionHash, 'Grant')}</div>` },
         { label: 'Actions', render: (p) => (p.status === 'ACTIVE' && p.record.hasFile
           ? `<div class="actions"><button class="btn btn-primary btn-sm" data-view="${p.record.id}">View</button><button class="btn btn-outline btn-sm" data-download="${p.record.id}">Download</button></div>`
           : '<span class="muted">—</span>') },

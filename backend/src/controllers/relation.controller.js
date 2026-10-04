@@ -9,6 +9,32 @@ const { parsePagination, paginated } = require('../utils/pagination');
 const { logAudit } = require('../services/audit.service');
 const { TRANSITIONS, revokeAllPermissionsForPair, toRelationView } = require('../services/relation.service');
 
+const AccessPermission = require('../models/AccessPermission');
+
+/** True if any of this patient's grants to the doctor is recorded on-chain and still active there. */
+async function hasActiveOnChainGrants(doctorId, patientId) {
+  const chain = require('../services/blockchain.service');
+  const perms = await AccessPermission.find({ doctorId, patientId, status: 'GRANTED', blockchainTransactionHash: { $exists: true }, expiresAt: { $gt: new Date() } }).select('recordId').lean();
+  for (const p of perms) if (await chain.hasAccess(p.recordId, doctorId)) return true;
+  return false;
+}
+
+/** GET /api/relations/:relationId/revoke/prepare — whether revoking needs a revokeDoctor() transaction. */
+async function prepareRevoke(req, res) {
+  const relation = await DoctorPatientRelation.findById(req.params.relationId).lean();
+  if (!relation || String(relation.patientId) !== String(req.user._id)) throw ApiError.notFound('Access request not found.', 'RELATION_NOT_FOUND');
+  if (relation.status !== RELATION_STATUS.APPROVED) throw ApiError.conflict(`Only APPROVED requests can be revoked (current status: ${relation.status}).`, 'INVALID_STATUS_TRANSITION');
+  if (!(await hasActiveOnChainGrants(relation.doctorId, req.user._id))) return res.json({ success: true, data: { needsChainTx: false } });
+  const chain = require('../services/blockchain.service');
+  const { requireLinkedWallet } = require('./permission.controller');
+  const wallet = await requireLinkedWallet(req);
+  const cfg = chain.publicConfig();
+  return res.json({ success: true, data: {
+    needsChainTx: true, contractAddress: cfg.contractAddress, chainId: cfg.chainId, wallet,
+    method: 'revokeDoctor', args: [chain.patientKey(req.user._id), chain.doctorKey(relation.doctorId)],
+  } });
+}
+
 function parseStatusFilter(raw) {
   if (!raw) return undefined;
   const list = String(raw).toUpperCase().split(',').map((s) => s.trim()).filter(Boolean);
@@ -121,6 +147,21 @@ function transition(kind) {
       }
     }
 
+    // Revoking a doctor who holds grants that are active on-chain requires the patient's
+    // revokeDoctor() transaction, verified here, so the blockchain agrees with the database.
+    let chainRevoke = null;
+    if (kind === 'revoke') {
+      const txHash = String((req.body || {}).txHash || '').toLowerCase();
+      const needsTx = await hasActiveOnChainGrants(relation.doctorId, req.user._id);
+      if (needsTx || txHash) {
+        if (!txHash) throw ApiError.badRequest('Revoking this doctor requires a blockchain transaction signed in MetaMask.', 'TX_REQUIRED');
+        const chain = require('../services/blockchain.service');
+        const { requireLinkedWallet } = require('./permission.controller');
+        const wallet = await requireLinkedWallet(req);
+        chainRevoke = await chain.verifyDoctorRevokeTx(txHash, { patientId: req.user._id, doctorId: relation.doctorId, wallet });
+      }
+    }
+
     const now = new Date();
     const update = { status: to };
     if (kind === 'approve') { update.approvedAt = now; update.$unset = { revokedAt: 1 }; }
@@ -135,11 +176,12 @@ function transition(kind) {
     if (!updated) throw ApiError.conflict('Request changed concurrently. Refresh and try again.', 'CONCURRENT_UPDATE');
 
     let permissionsRevoked = 0;
-    if (kind === 'revoke') permissionsRevoked = await revokeAllPermissionsForPair(relation.doctorId, req.user._id, now);
+    if (kind === 'revoke') permissionsRevoked = await revokeAllPermissionsForPair(relation.doctorId, req.user._id, now, chainRevoke ? chainRevoke.txHash : undefined);
 
     await logAudit({
       req, action: audit, patientId: req.user._id, doctorId: relation.doctorId,
-      metadata: { scope: 'RELATION', relationId: String(relation._id), ...(kind === 'revoke' ? { permissionsRevoked } : {}) },
+      ...(chainRevoke ? { blockchainTransactionHash: chainRevoke.txHash } : {}),
+      metadata: { scope: 'RELATION', relationId: String(relation._id), ...(kind === 'revoke' ? { permissionsRevoked, onChain: Boolean(chainRevoke) } : {}) },
     });
     const [view] = await attachDoctorProfiles([updated]);
     res.json({ success: true, data: { relation: toRelationView(view), ...(kind === 'revoke' ? { permissionsRevoked } : {}) } });
@@ -147,6 +189,7 @@ function transition(kind) {
 }
 
 module.exports = {
+  prepareRevoke,
   requestAccess,
   listForDoctor,
   listForPatient,

@@ -176,8 +176,19 @@ async function upload(req, res) {
     req, action: 'RECORD_UPLOAD', patientId, recordId: rec._id, ...(req.user.role === R.DOCTOR ? { doctorId: req.user._id } : {}),
     metadata: { mimeType: file.mimetype, fileSize: file.size, uploadedByRole: req.user.role },
   });
+  // Anchor the SHA-256 fingerprint on-chain. If the chain is unavailable the upload still succeeds;
+  // anchoring is retried automatically before the record can be shared.
+  let anchoring = 'ANCHORED';
+  try {
+    const { anchorRecord } = require('../services/anchor.service');
+    await anchorRecord(rec, { req });
+  } catch (err) {
+    anchoring = 'PENDING';
+    console.warn('[blockchain] record anchoring deferred:', err.code || err.message);
+  }
+
   const populated = await MedicalRecord.findById(rec._id).populate('uploadedBy', 'name role').lean();
-  res.status(201).json({ success: true, data: { record: toRecordView(populated) } });
+  res.status(201).json({ success: true, data: { record: toRecordView(populated), anchoring } });
 }
 
 /**

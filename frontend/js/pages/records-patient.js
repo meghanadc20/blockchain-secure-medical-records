@@ -52,6 +52,7 @@ Layout.ready.then(() => {
         <dt>Uploaded by</dt><dd>${UI.esc(r.uploadedBy.name || '—')}</dd>
         <dt>File</dt><dd>${r.hasFile ? `${UI.esc(r.fileName || 'Stored file')} · ${UI.formatBytes(r.fileSize)} · <span class="badge badge-verified" style="text-transform:none">Encrypted at rest</span>` : '<span class="muted">No file attached</span>'}</dd>
         <dt>Access</dt><dd>${r.activeShares ? `<span class="badge badge-active" style="text-transform:none">${r.activeShares} doctor${r.activeShares > 1 ? 's' : ''} with active access</span>` : '<span class="muted">Not shared</span>'}</dd>
+        <dt>Blockchain</dt><dd>${r.blockchainTransactionHash ? UI.chainBadge(r.blockchainTransactionHash, 'Fingerprint anchored') : (r.hasFile ? '<span class="badge badge-pending" style="text-transform:none">Anchoring pending</span>' : '<span class="muted">—</span>')}</dd>
         <dt>Integrity</dt><dd><span class="muted">Not yet verified (Module 6)</span></dd>
       </dl>
       <div class="actions">
@@ -133,10 +134,17 @@ Layout.ready.then(() => {
           else expiresAt = new Date(v.custom).toISOString();
         } else expiresAt = new Date(Date.now() + Number(v.preset) * 60000).toISOString();
         if (errs.length) { const e = new Error('Please correct the highlighted fields.'); e.details = errs; throw e; }
-        return API.post('/permissions', { recordId: r.id, doctorId: v.doctorId, expiresAt });
+        // 1) backend validates and says exactly what to sign  2) patient signs grantAccess in MetaMask
+        // 3) backend verifies the mined transaction before storing the permission.
+        const submit = document.querySelector('#fm-form button[type="submit"]');
+        const step = (t) => { if (submit) submit.innerHTML = `<span class="spinner spinner-sm" aria-hidden="true"></span> ${UI.esc(t)}`; };
+        step('Preparing…');
+        const prep = await API.post('/permissions/prepare', { recordId: r.id, doctorId: v.doctorId, expiresAt });
+        const txHash = await Wallet.sendPrepared(prep, step);
+        return API.post('/permissions', { recordId: r.id, doctorId: v.doctorId, expiresAt: prep.expiresAt, txHash });
       },
     });
-    if (saved) { UI.toast(`Shared with Dr. ${saved.permission.doctor.name} until ${UI.formatDate(saved.permission.expiresAt, true)}.`); load(); }
+    if (saved) { UI.toast(`Shared with Dr. ${saved.permission.doctor.name} until ${UI.formatDate(saved.permission.expiresAt, true)} — recorded on the blockchain.`); load(); }
   }
   // Show the custom date field when "Custom" is chosen (modal is created dynamically).
   document.addEventListener('change', (e) => {
@@ -161,6 +169,7 @@ Layout.ready.then(() => {
           { label: 'Granted', render: (p) => UI.formatDate(p.grantedAt, true) },
           { label: 'Expires', render: (p) => `${UI.formatDate(p.expiresAt, true)}<span class="cell-sub">${p.status === 'ACTIVE' ? UI.relativeTime(p.expiresAt) : ''}</span>` },
           { label: 'Status', render: (p) => `${UI.badge(p.status)}${p.revokedAt ? `<span class="cell-sub">Revoked ${UI.formatDate(p.revokedAt, true)}</span>` : ''}` },
+          { label: 'Blockchain', render: (p) => `${UI.chainBadge(p.blockchainTransactionHash, 'Grant')}${p.revokeTransactionHash ? `<div style="margin-top:4px">${UI.chainBadge(p.revokeTransactionHash, 'Revoke')}</div>` : ''}` },
           { label: 'Action', render: (p) => (p.status === 'ACTIVE' ? `<button class="btn btn-danger btn-sm" data-revoke="${p.id}">Revoke</button>` : '<span class="muted">—</span>') },
         ], data.items, { caption: 'Access history for this record' })
           : UI.state('empty', 'Not shared yet', 'Use “Share” to give an authorized doctor time-limited access.');
@@ -171,7 +180,13 @@ Layout.ready.then(() => {
       if (!b) return;
       const { confirmed } = await UI.confirm({ title: 'Revoke access?', message: 'The doctor will be unable to open this record from their next request.', confirmLabel: 'Revoke', danger: true });
       if (!confirmed) return;
-      try { await API.patch(`/permissions/${b.dataset.revoke}/revoke`); UI.toast('Access revoked.'); } catch (err) { UI.toast(err.message, 'error'); }
+      UI.setLoading(b, true, 'Preparing…');
+      try {
+        const prep = await API.get(`/permissions/${b.dataset.revoke}/revoke/prepare`);
+        const body = prep.needsChainTx ? { txHash: await Wallet.sendPrepared(prep, (t) => UI.setLoading(b, true, t)) } : {};
+        await API.patch(`/permissions/${b.dataset.revoke}/revoke`, body);
+        UI.toast(prep.needsChainTx ? 'Access revoked and recorded on the blockchain.' : 'Access revoked.');
+      } catch (err) { UI.toast(err.message, 'error'); }
       render();
     });
     render();

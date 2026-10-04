@@ -16,6 +16,7 @@ router.get('/doctor', authorize(ROLES.DOCTOR), ctrl.listForDoctor);
 router.get('/patient', authorize(ROLES.PATIENT), ctrl.listForPatient);
 router.patch('/:relationId/approve', authorize(ROLES.PATIENT), validateId('relationId'), ctrl.approve);
 router.patch('/:relationId/reject', authorize(ROLES.PATIENT), validateId('relationId'), ctrl.reject);
+router.get('/:relationId/revoke/prepare', authorize(ROLES.PATIENT), validateId('relationId'), ctrl.prepareRevoke);
 router.patch('/:relationId/revoke', authorize(ROLES.PATIENT), validateId('relationId'), ctrl.revoke);
 
 module.exports = router;

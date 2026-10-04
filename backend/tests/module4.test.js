@@ -9,6 +9,7 @@ const { createApp } = require('../src/app');
 const { getSupabase } = require('../src/config/supabase');
 const { ensureBucket } = require('../scripts/setupStorage');
 const { expireDuePermissions } = require('../src/services/permission.service');
+const { startTestChain, freshWallet, linkWallet, share, revokeShare, revokeRelation } = require('./chain');
 
 const BUCKET = process.env.SUPABASE_BUCKET;
 const PDF = Buffer.concat([Buffer.from('%PDF-1.4\n'), crypto.randomBytes(1024), Buffer.from('\n%%EOF\n')]);
@@ -28,9 +29,13 @@ async function file(url, token, id) {
   return { status: r.status, buf, code };
 }
 
-describe('Phase 7 — Module 4: record sharing & access control', () => {
-  let M; let srv;
-  const t = {}; const id = {};
+describe('Phase 7 — Module 4: record sharing & access control (grants signed on Ganache)', () => {
+  let M; let srv; let ch;
+  const t = {}; const id = {}; const w = {};
+  // Every successful grant/revoke is a real patient-signed blockchain transaction (Module 5).
+  const walletFor = (token) => (token === t.patient ? w.patient : token === t.other ? w.other : undefined);
+  const grantApi = (token, body) => share(srv.url, token, walletFor(token), body);
+  const revokeApi = (token, permissionId) => revokeShare(srv.url, token, walletFor(token), permissionId);
   const reg = async (kind, body) => {
     const r = await call(srv.url, 'POST', `/api/auth/register/${kind}`, { body: { password: 'Secret123', phone: '9876543210', ...body } });
     assert.equal(r.status, 201); return r.body.data;
@@ -43,6 +48,7 @@ describe('Phase 7 — Module 4: record sharing & access control', () => {
 
   before(async () => {
     M = await setupTestDB();
+    ch = await startTestChain();
     await ensureBucket(BUCKET); await getSupabase().storage.emptyBucket(BUCKET);
     srv = await startServer(createApp());
     await M.User.create({ name: 'Admin', email: 'admin@example.com', role: 'ADMIN', passwordHash: await bcrypt.hash('AdminPass123', 4) });
@@ -56,6 +62,9 @@ describe('Phase 7 — Module 4: record sharing & access control', () => {
     id.rel1 = await relate(t.doctor, t.patient, 'asha@example.com');
     id.rel2 = await relate(t.doctor2, t.patient, 'asha@example.com');
     await call(srv.url, 'POST', '/api/relations/requests', { token: t.doctor3, body: { patientEmail: 'asha@example.com' } }); // pending only
+    w.patient = freshWallet(ch.provider); w.other = freshWallet(ch.provider);
+    assert.equal((await linkWallet(srv.url, t.patient, w.patient)).status, 200);
+    assert.equal((await linkWallet(srv.url, t.other, w.other)).status, 200);
     id.rec1 = await upload(srv.url, t.patient, 'Blood test');
     id.rec2 = await upload(srv.url, t.patient, 'X-ray');
     id.recOther = await upload(srv.url, t.other, 'Other');
@@ -63,6 +72,7 @@ describe('Phase 7 — Module 4: record sharing & access control', () => {
 
   after(async () => {
     await srv.close();
+    await ch.stop();
     try { await getSupabase().storage.emptyBucket(BUCKET); await new Promise((r) => setTimeout(r, 1500)); await getSupabase().storage.deleteBucket(BUCKET); } catch (e) { console.error('bucket cleanup', e.message); }
     await teardownTestDB();
   });
@@ -74,10 +84,11 @@ describe('Phase 7 — Module 4: record sharing & access control', () => {
     });
 
     it('patient grants time-limited access → 201 ACTIVE, audited', async () => {
-      const r = await call(srv.url, 'POST', '/api/permissions', { token: t.patient, body: { recordId: id.rec1, doctorId: id.doctor, expiresAt: inMin(60) } });
+      const r = await grantApi(t.patient, { recordId: id.rec1, doctorId: id.doctor, expiresAt: inMin(60) });
       assert.equal(r.status, 201, JSON.stringify(r.body));
       const p = r.body.data.permission;
       assert.equal(p.status, 'ACTIVE'); assert.equal(p.storedStatus, 'GRANTED');
+      assert.match(p.blockchainTransactionHash, /^0x[0-9a-f]{64}$/);
       assert.equal(p.record.title, 'Blood test'); assert.equal(p.doctor.name, 'Ravi');
       assert.ok(p.grantedAt && p.expiresAt);
       id.perm1 = p.id;
@@ -99,36 +110,36 @@ describe('Phase 7 — Module 4: record sharing & access control', () => {
     });
 
     it('doctor-to-doctor sharing goes through the patient: second doctor gets its own grant', async () => {
-      const r = await call(srv.url, 'POST', '/api/permissions', { token: t.patient, body: { recordId: id.rec1, doctorId: id.doctor2, expiresAt: inMin(30) } });
+      const r = await grantApi(t.patient, { recordId: id.rec1, doctorId: id.doctor2, expiresAt: inMin(30) });
       assert.equal(r.status, 201);
       assert.equal((await file(srv.url, t.doctor2, id.rec1)).status, 200);
     });
 
     it('rejects a duplicate active grant (409 ALREADY_GRANTED)', async () => {
-      const r = await call(srv.url, 'POST', '/api/permissions', { token: t.patient, body: { recordId: id.rec1, doctorId: id.doctor, expiresAt: inMin(90) } });
+      const r = await grantApi(t.patient, { recordId: id.rec1, doctorId: id.doctor, expiresAt: inMin(90) });
       assert.equal(r.status, 409); assert.equal(r.body.error.code, 'ALREADY_GRANTED');
     });
 
     it('validates expiry: past, < 5 minutes, > 1 year, invalid', async () => {
       for (const expiresAt of [inMin(-10), inMin(2), inMin(60 * 24 * 400), 'not-a-date']) {
-        const r = await call(srv.url, 'POST', '/api/permissions', { token: t.patient, body: { recordId: id.rec2, doctorId: id.doctor, expiresAt } });
+        const r = await grantApi(t.patient, { recordId: id.rec2, doctorId: id.doctor, expiresAt });
         assert.equal(r.status, 400, expiresAt);
       }
     });
 
     it('cannot grant to a doctor without an APPROVED relationship, or to a non-doctor', async () => {
-      let r = await call(srv.url, 'POST', '/api/permissions', { token: t.patient, body: { recordId: id.rec2, doctorId: id.doctor3, expiresAt: inMin(60) } });
+      let r = await grantApi(t.patient, { recordId: id.rec2, doctorId: id.doctor3, expiresAt: inMin(60) });
       assert.equal(r.status, 409); assert.equal(r.body.error.code, 'RELATION_NOT_APPROVED');
-      r = await call(srv.url, 'POST', '/api/permissions', { token: t.patient, body: { recordId: id.rec2, doctorId: id.other, expiresAt: inMin(60) } });
+      r = await grantApi(t.patient, { recordId: id.rec2, doctorId: id.other, expiresAt: inMin(60) });
       assert.equal(r.status, 404);
     });
 
     it('cannot share someone else\'s record (404); doctors/admins cannot grant (403)', async () => {
-      let r = await call(srv.url, 'POST', '/api/permissions', { token: t.patient, body: { recordId: id.recOther, doctorId: id.doctor, expiresAt: inMin(60) } });
+      let r = await grantApi(t.patient, { recordId: id.recOther, doctorId: id.doctor, expiresAt: inMin(60) });
       assert.equal(r.status, 404);
-      r = await call(srv.url, 'POST', '/api/permissions', { token: t.doctor, body: { recordId: id.rec2, doctorId: id.doctor, expiresAt: inMin(60) } });
+      r = await grantApi(t.doctor, { recordId: id.rec2, doctorId: id.doctor, expiresAt: inMin(60) });
       assert.equal(r.status, 403);
-      r = await call(srv.url, 'POST', '/api/permissions', { token: t.admin, body: { recordId: id.rec2, doctorId: id.doctor, expiresAt: inMin(60) } });
+      r = await grantApi(t.admin, { recordId: id.rec2, doctorId: id.doctor, expiresAt: inMin(60) });
       assert.equal(r.status, 403);
     });
 
@@ -148,7 +159,7 @@ describe('Phase 7 — Module 4: record sharing & access control', () => {
 
   describe('13. revoke', () => {
     it('patient revokes → doctor denied immediately with PERMISSION_REVOKED (audited)', async () => {
-      const r = await call(srv.url, 'PATCH', `/api/permissions/${id.perm1}/revoke`, { token: t.patient });
+      const r = await revokeApi(t.patient, id.perm1);
       assert.equal(r.status, 200); assert.equal(r.body.data.permission.status, 'REVOKED');
       assert.ok(r.body.data.permission.revokedAt);
       const f = await file(srv.url, t.doctor, id.rec1);
@@ -161,13 +172,13 @@ describe('Phase 7 — Module 4: record sharing & access control', () => {
     });
 
     it('revoking twice is 409; another patient cannot revoke (404)', async () => {
-      assert.equal((await call(srv.url, 'PATCH', `/api/permissions/${id.perm1}/revoke`, { token: t.patient })).status, 409);
+      assert.equal((await revokeApi(t.patient, id.perm1)).status, 409);
       const p2 = (await call(srv.url, 'GET', `/api/permissions?doctorId=${id.doctor2}`, { token: t.patient })).body.data.items[0];
-      assert.equal((await call(srv.url, 'PATCH', `/api/permissions/${p2.id}/revoke`, { token: t.other })).status, 404);
+      assert.equal((await revokeApi(t.other, p2.id)).status, 404);
     });
 
     it('patient can grant again after revoking (new permission, history kept)', async () => {
-      const r = await call(srv.url, 'POST', '/api/permissions', { token: t.patient, body: { recordId: id.rec1, doctorId: id.doctor, expiresAt: inMin(60) } });
+      const r = await grantApi(t.patient, { recordId: id.rec1, doctorId: id.doctor, expiresAt: inMin(60) });
       assert.equal(r.status, 201);
       assert.equal(await M.AccessPermission.countDocuments({ recordId: id.rec1, doctorId: id.doctor }), 2);
       assert.equal((await file(srv.url, t.doctor, id.rec1)).status, 200);
@@ -176,7 +187,7 @@ describe('Phase 7 — Module 4: record sharing & access control', () => {
 
   describe('17. expired access', () => {
     it('access ends at expiresAt even before any sweep runs (PERMISSION_EXPIRED, audited)', async () => {
-      const r = await call(srv.url, 'POST', '/api/permissions', { token: t.patient, body: { recordId: id.rec2, doctorId: id.doctor, expiresAt: inMin(10) } });
+      const r = await grantApi(t.patient, { recordId: id.rec2, doctorId: id.doctor, expiresAt: inMin(10) });
       assert.equal(r.status, 201);
       assert.equal((await file(srv.url, t.doctor, id.rec2)).status, 200);
       // Simulate the passage of time: move expiry into the past.
@@ -208,7 +219,8 @@ describe('Phase 7 — Module 4: record sharing & access control', () => {
     });
 
     it('an expired permission can be replaced by a new grant', async () => {
-      const r = await call(srv.url, 'POST', '/api/permissions', { token: t.patient, body: { recordId: id.rec2, doctorId: id.doctor, expiresAt: inMin(60) } });
+      await ch.increaseTime(11 * 60); // the on-chain grant (10 min) must also have expired
+      const r = await grantApi(t.patient, { recordId: id.rec2, doctorId: id.doctor, expiresAt: inMin(60) });
       assert.equal(r.status, 201);
       assert.equal((await file(srv.url, t.doctor, id.rec2)).status, 200);
     });
@@ -216,7 +228,7 @@ describe('Phase 7 — Module 4: record sharing & access control', () => {
 
   describe('relationship and verification still apply', () => {
     it('revoking the relationship revokes all record permissions for that doctor', async () => {
-      await call(srv.url, 'PATCH', `/api/relations/${id.rel1}/revoke`, { token: t.patient });
+      assert.equal((await revokeRelation(srv.url, t.patient, w.patient, id.rel1)).status, 200);
       assert.equal(await M.AccessPermission.countDocuments({ doctorId: id.doctor, status: 'GRANTED' }), 0);
       const f = await file(srv.url, t.doctor, id.rec2);
       assert.equal(f.status, 403);
@@ -224,7 +236,7 @@ describe('Phase 7 — Module 4: record sharing & access control', () => {
     });
 
     it('a doctor rejected by the admin loses access even with a live permission', async () => {
-      const r = await call(srv.url, 'POST', '/api/permissions', { token: t.patient, body: { recordId: id.rec2, doctorId: id.doctor2, expiresAt: inMin(60) } });
+      const r = await grantApi(t.patient, { recordId: id.rec2, doctorId: id.doctor2, expiresAt: inMin(60) });
       assert.equal(r.status, 201);
       assert.equal((await file(srv.url, t.doctor2, id.rec2)).status, 200);
       await call(srv.url, 'PATCH', `/api/admin/doctors/${id.doctor2}/reject`, { token: t.admin });

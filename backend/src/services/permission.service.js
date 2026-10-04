@@ -7,6 +7,7 @@
  *   2. the doctor–patient relationship is APPROVED,
  *   3. a permission for (record, doctor) has status GRANTED,
  *   4. expiresAt is in the future.
+ *   5. (Module 5) the grant was recorded on-chain and the contract's hasAccess() confirms it.
  * Expiry is enforced at the moment of access (not only by the periodic sweep), so access ends
  * exactly when the permission expires. Revocation takes effect on the next request.
  */
@@ -51,7 +52,18 @@ async function checkDoctorRecordAccess(doctorId, record, { req } = {}) {
 
   const live = await AccessPermission.findOne({ recordId: record._id, doctorId, status: PERMISSION_STATUS.GRANTED }).lean();
   if (live) {
-    if (new Date(live.expiresAt) > new Date()) return { allowed: true, permission: live };
+    if (new Date(live.expiresAt) > new Date()) {
+      // Second, independent check on the blockchain (fail-closed: chain errors deny access).
+      if (!live.blockchainTransactionHash) {
+        return { allowed: false, code: 'PERMISSION_NOT_ON_CHAIN', message: 'This permission was not recorded on the blockchain. Ask the patient to share the record again.', permission: live };
+      }
+      const chain = require('./blockchain.service');
+      const onChain = await chain.hasAccess(record._id, doctorId);
+      if (!onChain) {
+        return { allowed: false, code: 'BLOCKCHAIN_PERMISSION_DENIED', message: 'The blockchain does not confirm your access to this record.', permission: live };
+      }
+      return { allowed: true, permission: live };
+    }
     await markExpired(live, { req });
     return { allowed: false, code: 'PERMISSION_EXPIRED', message: 'Your access to this record has expired.', permission: live };
   }

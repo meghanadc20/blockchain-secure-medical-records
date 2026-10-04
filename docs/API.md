@@ -223,3 +223,25 @@ Permission view: `{ id, status: ACTIVE|EXPIRED|REVOKED, storedStatus: GRANTED|EX
 
 `GET /api/records` (patient) now also returns `activeShares` per record.
 Denied reads are audited `ACCESS_DENIED` with `reason` = `PERMISSION_DENIED | PERMISSION_EXPIRED | PERMISSION_REVOKED | NOT_RECORD_OWNER`.
+
+---
+
+## Blockchain (Module 5)
+
+See [BLOCKCHAIN.md](BLOCKCHAIN.md) for the contract and flows.
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET | `/api/blockchain/config` | Authenticated | `{ contractAddress, chainId, rpcUrl, abi, localTestNetwork }` — public info only. `503 BLOCKCHAIN_UNAVAILABLE` |
+| POST | `/api/blockchain/wallet/challenge` | Patient | Body `{ address }` → `{ message, challengeToken }` (10 min) |
+| POST | `/api/blockchain/wallet/link` | Patient | Body `{ address, signature, challengeToken }`. Verifies the signature, registers the wallet on-chain, funds it with local **test** ether. `400 SIGNATURE_INVALID / CHALLENGE_INVALID`, `409 WALLET_IN_USE`. Audited `WALLET_LINKED` with tx hash |
+| POST | `/api/permissions/prepare` | Patient | Same body/validation as a grant. Requires a linked wallet (`409 WALLET_NOT_LINKED`), anchors the record if pending. Returns `{ contractAddress, chainId, wallet, method: 'grantAccess', args: [recordKey, doctorKey, expiresAtSeconds], expiresAt }` |
+| POST | `/api/permissions` | Patient | Now **requires** `txHash` of the signed `grantAccess`. Verified from the receipt (`400 BLOCKCHAIN_TX_INVALID`, `409 TX_ALREADY_USED`, `409 BLOCKCHAIN_STATE_MISMATCH`). Stores `blockchainTransactionHash` |
+| GET | `/api/permissions/:id/revoke/prepare` | Patient | `{ needsChainTx: false }` or the `revokeAccess` call to sign |
+| PATCH | `/api/permissions/:id/revoke` | Patient | Body `{ txHash }` required when the grant is active on-chain (`400 TX_REQUIRED`). Stores `revokeTransactionHash` |
+| GET | `/api/relations/:id/revoke/prepare` | Patient | `{ needsChainTx }` and, if needed, the `revokeDoctor` call |
+| PATCH | `/api/relations/:id/revoke` | Patient | Body `{ txHash }` required if the doctor holds active on-chain grants |
+
+Upload responses include `anchoring: 'ANCHORED' | 'PENDING'`; records carry `blockchainTransactionHash` once anchored (audited `RECORD_HASH_ANCHORED`).
+Doctor reads additionally fail with `403 PERMISSION_NOT_ON_CHAIN`, `403 BLOCKCHAIN_PERMISSION_DENIED` or `503 BLOCKCHAIN_UNAVAILABLE`.
+`GET /api/health` → `data.blockchain`: `{ configured, reachable, chainId, localTestNetwork, contractAddress, contractDeployed, signerIsOwner, blockNumber }`.

@@ -224,7 +224,7 @@
       const previous = document.activeElement;
       const backdrop = document.createElement('div');
       backdrop.className = 'modal-backdrop';
-      backdrop.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="dlg-title" style="${wide ? 'max-width:760px' : ''}">
+      backdrop.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="dlg-title" style="${wide ? 'max-width:min(1000px, 100%)' : ''}">
         <div class="card-header"><h2 id="dlg-title" style="font-size:1.2rem;margin:0">${UI.esc(title)}</h2>
         <button type="button" class="btn btn-outline btn-sm" data-act="close" aria-label="Close">Close</button></div>
         <div class="dlg-body">${bodyHtml}</div></div>`;
@@ -255,6 +255,15 @@
 
     /** Expiry presets for sharing (value = minutes). */
     EXPIRY_PRESETS: [[60, '1 hour'], [1440, '24 hours'], [10080, '7 days'], [43200, '30 days'], ['custom', 'Custom date & time…']],
+
+    shortHash(h) { return h ? `${h.slice(0, 10)}…${h.slice(-6)}` : '—'; },
+
+    /** Small on-chain proof badge with the full hash in the tooltip. */
+    chainBadge(txHash, label = 'On-chain') {
+      return txHash
+        ? `<span class="badge badge-verified" style="text-transform:none" title="Transaction ${UI.esc(txHash)}">${UI.esc(label)} · ${UI.esc(UI.shortHash(txHash))}</span>`
+        : '<span class="badge badge-pending" style="text-transform:none">Not on-chain</span>';
+    },
 
     /** Renders a simple data table. columns: [{ label, render(row) → HTML string }] */
     table(columns, rows, { caption } = {}) {

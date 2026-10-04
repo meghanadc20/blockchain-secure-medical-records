@@ -35,6 +35,16 @@ npm run storage:setup
 ```
 Back up `FILE_ENCRYPTION_KEY` safely — encrypted files cannot be decrypted without it.
 
+## 3c. Local blockchain (Ganache) — test network only
+Install the MetaMask browser extension and create a wallet used **only** for this project. Then, in `backend/`:
+```bash
+npm install            # installs ethers, ganache, solc
+npm run chain          # terminal 1 — keep it open (local Ganache, chainId 1337)
+npm run chain:deploy   # terminal 2 — once; saves CONTRACT_ADDRESS to .env
+```
+`.env` already holds `GANACHE_MNEMONIC`, `BLOCKCHAIN_RPC_URL`, `CHAIN_ID` and `PRIVATE_KEY` (first local test account). Never use these on a real network.
+In the app, a patient links MetaMask on **Profile → Blockchain wallet** before sharing records.
+
 ## 3b. Run
 ```bash
 cd backend

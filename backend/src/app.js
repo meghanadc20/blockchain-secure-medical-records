@@ -12,6 +12,7 @@ const recordRoutes = require('./routes/record.routes');
 const consultationRoutes = require('./routes/consultation.routes');
 const historyRoutes = require('./routes/history.routes');
 const permissionRoutes = require('./routes/permission.routes');
+const blockchainRoutes = require('./routes/blockchain.routes');
 const { notFoundApi, errorHandler } = require('./middleware/errorHandler');
 
 const FRONTEND_DIR = path.resolve(__dirname, '../../frontend');
@@ -43,6 +44,7 @@ function createApp() {
   app.use('/api/consultations', consultationRoutes);
   app.use('/api/history', historyRoutes);
   app.use('/api/permissions', permissionRoutes);
+  app.use('/api/blockchain', blockchainRoutes);
   app.use('/api', notFoundApi);
 
   // ---------- Frontend (plain HTML/CSS/JS) ----------

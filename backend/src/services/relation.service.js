@@ -22,13 +22,13 @@ async function hasApprovedRelation(doctorId, patientId) {
 
 /**
  * When a relationship is revoked, every live record permission for that pair is revoked too,
- * so access stops immediately. (On-chain revocation is added with the blockchain layer.)
+ * so access stops immediately. On-chain, the patient's revokeDoctor() transaction invalidates them.
  * Returns the number of permissions revoked.
  */
-async function revokeAllPermissionsForPair(doctorId, patientId, now = new Date()) {
+async function revokeAllPermissionsForPair(doctorId, patientId, now = new Date(), revokeTxHash = undefined) {
   const res = await AccessPermission.updateMany(
     { doctorId, patientId, status: PERMISSION_STATUS.GRANTED },
-    { status: PERMISSION_STATUS.REVOKED, revokedAt: now }
+    { status: PERMISSION_STATUS.REVOKED, revokedAt: now, ...(revokeTxHash ? { revokeTransactionHash: revokeTxHash.toLowerCase() } : {}) }
   );
   return res.modifiedCount || 0;
 }

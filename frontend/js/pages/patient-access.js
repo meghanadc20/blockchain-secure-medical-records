@@ -55,7 +55,7 @@ Layout.ready.then(() => {
   const COPY = {
     approve: { title: 'Approve this doctor?', message: 'The doctor will be able to receive access to records you choose to share. No records are shared until you grant them individually.', confirmLabel: 'Approve', danger: false, done: 'Access request approved.' },
     reject: { title: 'Reject this request?', message: 'The doctor will not be given access. They may send a new request later.', confirmLabel: 'Reject', danger: true, done: 'Access request rejected.' },
-    revoke: { title: 'Revoke this doctor’s access?', message: 'Access ends immediately, including any records you have shared with this doctor.', confirmLabel: 'Revoke access', danger: true, done: 'Access revoked.' },
+    revoke: { title: 'Revoke this doctor’s access?', message: 'Access ends immediately, including every record you have shared with this doctor. If any of those shares are recorded on the blockchain, MetaMask will ask you to confirm one transaction.', confirmLabel: 'Revoke access', danger: true, done: 'Access revoked.' },
   };
 
   listEl.addEventListener('click', async (e) => {
@@ -67,7 +67,13 @@ Layout.ready.then(() => {
     if (!confirmed) return;
     UI.setLoading(btn, true, '…');
     try {
-      const res = await API.patch(`/relations/${id}/${act}`);
+      let body;
+      if (act === 'revoke') {
+        // If this doctor holds grants that are active on-chain, the patient signs revokeDoctor() in MetaMask.
+        const prep = await API.get(`/relations/${id}/revoke/prepare`);
+        if (prep.needsChainTx) body = { txHash: await Wallet.sendPrepared(prep, (t) => UI.setLoading(btn, true, t)) };
+      }
+      const res = await API.patch(`/relations/${id}/${act}`, body);
       UI.toast(act === 'revoke' && res.permissionsRevoked ? `${c.done} ${res.permissionsRevoked} shared record(s) revoked.` : c.done);
       await Promise.all([load(), refreshCounts()]);
     } catch (err) {
