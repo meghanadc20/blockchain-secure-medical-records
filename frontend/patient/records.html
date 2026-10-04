@@ -4,27 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
-  <title>Dashboard · Secure Medical Data Sharing</title>
+  <title>Medical Records · Secure Medical Data Sharing</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
   <link rel="stylesheet" href="/css/app.css">
 </head>
-<body data-role="DOCTOR" data-page="dashboard" data-title="Dashboard">
+<body data-role="PATIENT" data-page="records" data-title="Medical Records">
   <div id="app-root"><div class="app-loading"><div class="state" role="status"><div class="spinner" aria-hidden="true"></div>Loading…</div></div></div>
   <template id="page-content">
-    <div class="page-header"><div><h1 id="welcome">Welcome</h1><p>Patients who have authorised you, and your access requests.</p></div></div>
-    <div id="verification-alert" class="alert" hidden></div>
-    <div class="grid grid-3" id="stats" style="margin-bottom:20px"></div>
-    <section class="card" aria-labelledby="acct-title">
-      <div class="card-header"><h2 class="card-title" id="acct-title">Professional profile</h2><span id="verification-badge"></span></div>
-      <dl id="account" class="kv"></dl>
-    </section>
+    <div class="page-header"><div><h1>Medical Records</h1><p>Upload and manage your medical reports.</p></div></div>
+    <div class="card"><div class="state"><div class="state-title">Not available yet</div><div>This section is delivered with Modules 2 and 3 (medical records and secure storage). Nothing is shown here until it is built.</div></div></div>
   </template>
   <script src="/js/api.js" defer></script>
   <script src="/js/ui.js" defer></script>
   <script src="/js/layout.js" defer></script>
-  <script src="/js/pages/dashboard.js" defer></script>
+
 </body>
 </html>

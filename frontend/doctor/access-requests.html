@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Access Requests · Secure Medical Data Sharing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body data-role="DOCTOR" data-page="access-requests" data-title="Access Requests">
+  <div id="app-root"><div class="app-loading"><div class="state" role="status"><div class="spinner" aria-hidden="true"></div>Loading…</div></div></div>
+  <template id="page-content">
+    <div class="page-header"><div><h1>Access requests</h1><p>Request access to a patient using the email address they registered with. The patient decides whether to approve.</p></div></div>
+    <div id="verify-alert" class="alert" hidden></div>
+    <section class="card" aria-labelledby="req-title" style="margin-bottom:20px">
+      <h2 class="card-title" id="req-title" style="margin-bottom:12px">New request</h2>
+      <div id="form-alert" class="alert" hidden></div>
+      <form id="request-form" class="inline-form" method="post" action="#" novalidate>
+        <div class="form-group"><label for="patientEmail">Patient email</label><input class="form-control" id="patientEmail" name="patientEmail" type="email" autocomplete="off" maxlength="254" required><div class="field-error" data-error-for="patientEmail"></div></div>
+        <button class="btn btn-primary" type="submit" style="margin-top:28px" disabled data-requires-js>Send request</button>
+      </form>
+    </section>
+    <section aria-labelledby="mine-title">
+      <h2 class="card-title" id="mine-title" style="margin-bottom:12px">My requests</h2>
+      <div id="list"></div>
+    </section>
+  </template>
+  <script src="/js/api.js" defer></script>
+  <script src="/js/ui.js" defer></script>
+  <script src="/js/layout.js" defer></script>
+  <script src="/js/pages/doctor-access.js" defer></script>
+</body>
+</html>

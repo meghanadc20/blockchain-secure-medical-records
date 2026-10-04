@@ -85,3 +85,55 @@ There is no admin registration endpoint. Create the internal admin from `.env`:
 npm run seed:admin                      # create if missing
 npm run seed:admin -- --reset-password  # update password from .env
 ```
+
+---
+
+## Profiles (all roles)
+
+### `GET /api/profile`
+Authenticated. Returns `{ user }` (same shape as login; doctors include `doctorProfile`).
+
+### `PATCH /api/profile`
+Authenticated. Editable: `name`, `phone`; doctors also `specialization`, `hospital`.
+`email`, `role`, `password`, `licenseNumber`, `verificationStatus`, `walletAddress` → `400 FIELD_NOT_EDITABLE`.
+→ `200 { user }` · `400 VALIDATION_ERROR | NOTHING_TO_UPDATE` · audited as `PROFILE_UPDATED`.
+
+---
+
+## Admin — doctor verification
+All routes require a valid JWT **and** role `ADMIN` (`401` / `403 FORBIDDEN_ROLE` otherwise).
+There are no admin endpoints for medical records, consultations or permissions.
+
+Doctor view: `{ doctorId, name, email, phone, specialization, licenseNumber, hospital, verificationStatus, verifiedAt, registeredAt, updatedAt }`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/admin/stats` | `{ doctors: { pending, approved, rejected, total }, patients }` — counts only |
+| GET | `/api/admin/doctors?status=PENDING\|APPROVED\|REJECTED&q=&page=&limit=` | Paginated list (`{ items, total, page, limit, pages }`). Pending oldest first. `q` searches name, email, licence, hospital, specialization |
+| GET | `/api/admin/doctors/:doctorId` | One doctor → `404 DOCTOR_NOT_FOUND`, `400 INVALID_ID` |
+| PATCH | `/api/admin/doctors/:doctorId/approve` | → `APPROVED`, sets `verifiedAt`; audited `DOCTOR_APPROVED` |
+| PATCH | `/api/admin/doctors/:doctorId/reject` | Body `{ reason? }` (≤500 chars) → `REJECTED`; audited `DOCTOR_REJECTED` with reason |
+
+Approving/rejecting a doctor already in that status → `409 ALREADY_IN_STATUS`. Updates are conditional (`409 CONCURRENT_UPDATE` if changed meanwhile).
+
+---
+
+## Doctor–patient relationships (Module 1)
+
+A verified doctor requests access to a patient; the patient approves, rejects or revokes.
+Record-level, time-limited permissions (Module 4) can only exist while the relationship is `APPROVED`.
+
+Relation view: `{ id, status, requestedAt, approvedAt, revokedAt, updatedAt, doctor?: { id, name, email, specialization, hospital, licenseNumber, verificationStatus }, patient?: { id, name, email } }`
+
+| Method | Path | Who | Result |
+|---|---|---|---|
+| POST | `/api/relations/requests` | **Verified** doctor | Body `{ patientEmail }`. `201` new / `200` re-opened after REJECTED or REVOKED. `404 PATIENT_NOT_FOUND`, `409 REQUEST_ALREADY_PENDING`, `409 ALREADY_APPROVED`, `403 DOCTOR_NOT_VERIFIED`. Audited `ACCESS_REQUEST` |
+| GET | `/api/relations/doctor?status=` | Doctor | Own requests/patients (`status` may be comma-separated) |
+| GET | `/api/relations/patient?status=` | Patient | Requests and authorised doctors for this patient |
+| PATCH | `/api/relations/:relationId/approve` | Owning patient | `PENDING → APPROVED`. `409 DOCTOR_NOT_VERIFIED` if the doctor lost verification. Audited `ACCESS_GRANTED` |
+| PATCH | `/api/relations/:relationId/reject` | Owning patient | `PENDING → REJECTED`. Audited `ACCESS_REJECTED` |
+| PATCH | `/api/relations/:relationId/revoke` | Owning patient | `APPROVED → REVOKED`; also revokes every live record permission for that doctor (`permissionsRevoked` in response). Audited `ACCESS_REVOKED` |
+
+- Any other transition → `409 INVALID_STATUS_TRANSITION`.
+- A relation belonging to another patient returns `404 RELATION_NOT_FOUND` (does not reveal it exists) and is audited as `ACCESS_DENIED`.
+- Doctors cannot approve their own requests (`403`); admins cannot use these endpoints (`403`).

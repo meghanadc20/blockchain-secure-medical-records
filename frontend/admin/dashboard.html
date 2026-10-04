@@ -15,16 +15,15 @@
   <div id="app-root"><div class="app-loading"><div class="state" role="status"><div class="spinner" aria-hidden="true"></div>Loading…</div></div></div>
   <template id="page-content">
     <div class="page-header"><div><h1 id="welcome">Welcome</h1><p>Platform administration: doctor verification. Administrators cannot view patient medical records.</p></div></div>
-    <div class="grid grid-2">
-      <section class="card" aria-labelledby="acct-title">
-        <div class="card-header"><h2 class="card-title" id="acct-title">Account</h2></div>
-        <dl id="account" class="kv"></dl>
-      </section>
-    </div>
+    <div class="grid grid-4" id="stats" style="margin-bottom:20px"></div>
+    <section class="card" aria-labelledby="queue-title">
+      <div class="card-header"><h2 class="card-title" id="queue-title">Waiting for verification</h2><a class="btn btn-outline btn-sm" href="/admin/doctors/pending">View all</a></div>
+      <div id="queue"></div>
+    </section>
   </template>
   <script src="/js/api.js" defer></script>
   <script src="/js/ui.js" defer></script>
   <script src="/js/layout.js" defer></script>
-  <script src="/js/pages/dashboard.js" defer></script>
+  <script src="/js/pages/admin-dashboard.js" defer></script>
 </body>
 </html>

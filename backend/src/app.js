@@ -5,6 +5,9 @@ const cors = require('cors');
 const { env } = require('./config/env');
 const healthRoutes = require('./routes/health.routes');
 const authRoutes = require('./routes/auth.routes');
+const profileRoutes = require('./routes/profile.routes');
+const adminRoutes = require('./routes/admin.routes');
+const relationRoutes = require('./routes/relation.routes');
 const { notFoundApi, errorHandler } = require('./middleware/errorHandler');
 
 const FRONTEND_DIR = path.resolve(__dirname, '../../frontend');
@@ -29,6 +32,9 @@ function createApp() {
   // ---------- API ----------
   app.use('/api/health', healthRoutes);
   app.use('/api/auth', authRoutes);
+  app.use('/api/profile', profileRoutes);
+  app.use('/api/admin', adminRoutes);
+  app.use('/api/relations', relationRoutes);
   app.use('/api', notFoundApi);
 
   // ---------- Frontend (plain HTML/CSS/JS) ----------

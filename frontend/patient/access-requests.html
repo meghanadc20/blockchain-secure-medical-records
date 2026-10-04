@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Access Requests · Secure Medical Data Sharing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body data-role="PATIENT" data-page="access-requests" data-title="Access Requests">
+  <div id="app-root"><div class="app-loading"><div class="state" role="status"><div class="spinner" aria-hidden="true"></div>Loading…</div></div></div>
+  <template id="page-content">
+    <div class="page-header"><div><h1>Access requests</h1><p>Doctors must be approved by you before they can be given access to any of your records. You can revoke access at any time.</p></div></div>
+    <div class="tabs" role="tablist" aria-label="Request status">
+      <button class="tab" role="tab" aria-selected="true" data-status="PENDING">Pending<span class="count" data-count="PENDING">0</span></button>
+      <button class="tab" role="tab" aria-selected="false" data-status="APPROVED">Authorized doctors<span class="count" data-count="APPROVED">0</span></button>
+      <button class="tab" role="tab" aria-selected="false" data-status="REJECTED,REVOKED">History<span class="count" data-count="REJECTED,REVOKED">0</span></button>
+    </div>
+    <div id="list" role="tabpanel"></div>
+  </template>
+  <script src="/js/api.js" defer></script>
+  <script src="/js/ui.js" defer></script>
+  <script src="/js/layout.js" defer></script>
+  <script src="/js/pages/patient-access.js" defer></script>
+</body>
+</html>
