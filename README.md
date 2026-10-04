@@ -38,7 +38,7 @@ npm run dev               # http://localhost:5000
 
 - [x] Phase 1 — Project setup
 - [x] Phase 2 — Database
-- [ ] Phase 3 — Authentication
+- [x] Phase 3 — Authentication
 - [ ] Phase 4 — Module 1: User, Doctor & Patient Management
 - [ ] Phase 5 — Module 2: Medical Records & Patient History
 - [ ] Phase 6 — Module 3: Secure Cloud Storage

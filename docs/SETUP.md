@@ -19,7 +19,15 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"   # JWT
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"   # FILE_ENCRYPTION_KEY
 ```
 
-## 2. Run
+## 2. Create the admin account
+Set `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (8+ chars, letters and numbers) in `.env`, then:
+```bash
+cd backend
+npm run seed:admin
+```
+The admin logs in on the normal `/login` page and is redirected to the admin dashboard. There is no public admin link or registration.
+
+## 3. Run
 ```bash
 cd backend
 npm install
@@ -28,7 +36,13 @@ npm run dev
 Open http://localhost:5000. Health check: http://localhost:5000/api/health
 (shows which config groups are present — never values).
 
-## 3. GitHub
+## 4. Tests
+```bash
+cd backend
+npm test   # uses <MONGO_DB_NAME>_test
+```
+
+## 5. GitHub
 ```bash
 git remote add origin https://github.com/<you>/<repo>.git
 git push -u origin main

@@ -1,4 +1,5 @@
 'use strict';
+require('./setupEnv');
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { setupTestDB, teardownTestDB } = require('./helpers');

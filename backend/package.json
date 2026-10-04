@@ -8,7 +8,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\"",
-    "db:indexes": "node scripts/syncIndexes.js"
+    "db:indexes": "node scripts/syncIndexes.js",
+    "seed:admin": "node scripts/seedAdmin.js"
   },
   "engines": {
     "node": ">=22"

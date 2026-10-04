@@ -1,0 +1,12 @@
+.auth-page { min-height: calc(100vh - 65px); display: grid; place-items: center; padding: 40px 16px; background: linear-gradient(180deg, var(--primary-soft) 0%, var(--bg) 60%); }
+.auth-card { width: 100%; max-width: 440px; }
+.auth-card.wide { max-width: 640px; }
+.auth-card h1 { font-size: 1.6rem; margin-bottom: 4px; }
+.auth-card .subtitle { color: var(--text-muted); margin-bottom: 24px; }
+.auth-footer { text-align: center; margin-top: 20px; font-size: .95rem; color: var(--text-muted); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.form-section-title { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin: 8px 0 12px; padding-top: 8px; border-top: 1px solid var(--border); }
+.password-wrap { position: relative; }
+.password-wrap .form-control { padding-right: 72px; }
+.password-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: 0; color: var(--primary); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; padding: 6px 8px; }
+@media (max-width: 560px) { .form-row { grid-template-columns: 1fr; } }

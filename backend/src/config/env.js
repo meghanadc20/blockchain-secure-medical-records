@@ -18,6 +18,7 @@ const env = {
 
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '2h',
+  bcryptRounds: Math.min(Math.max(Number(process.env.BCRYPT_ROUNDS) || 12, 4), 15),
 
   supabaseUrl: process.env.SUPABASE_URL,
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY,

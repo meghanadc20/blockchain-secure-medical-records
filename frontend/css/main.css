@@ -140,3 +140,6 @@ table.table { width: 100%; border-collapse: collapse; font-size: .92rem; }
 .footer { border-top: 1px solid var(--border); background: var(--card); padding: 24px 0; color: var(--text-muted); font-size: .9rem; margin-top: 64px; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+.spinner-sm { width: 16px; height: 16px; border-width: 2px; border-color: rgba(255,255,255,.4); border-top-color: #fff; }
+.btn-outline .spinner-sm { border-color: var(--border); border-top-color: var(--primary); }

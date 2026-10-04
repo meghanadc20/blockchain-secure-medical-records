@@ -27,3 +27,32 @@ async function teardownTestDB() {
 }
 
 module.exports = { setupTestDB, teardownTestDB, clearTestDB, TEST_DB };
+
+/** Starts an HTTP server for `app` on a random port. Returns { url, close }. */
+function startServer(app) {
+  return new Promise((resolve) => {
+    const server = app.listen(0, () => {
+      const { port } = server.address();
+      resolve({ url: `http://127.0.0.1:${port}`, close: () => new Promise((r) => server.close(r)) });
+    });
+  });
+}
+
+/** fetch wrapper returning { status, body }. */
+async function call(url, method, path, { body, token, headers = {} } = {}) {
+  const res = await fetch(url + path, {
+    method,
+    headers: {
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+    body: body === undefined ? undefined : (typeof body === 'string' ? body : JSON.stringify(body)),
+  });
+  let json = null;
+  try { json = await res.json(); } catch { /* not JSON */ }
+  return { status: res.status, body: json };
+}
+
+module.exports.startServer = startServer;
+module.exports.call = call;

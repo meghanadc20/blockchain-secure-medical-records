@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const { env } = require('./config/env');
 const healthRoutes = require('./routes/health.routes');
+const authRoutes = require('./routes/auth.routes');
 const { notFoundApi, errorHandler } = require('./middleware/errorHandler');
 
 const FRONTEND_DIR = path.resolve(__dirname, '../../frontend');
@@ -27,6 +28,7 @@ function createApp() {
 
   // ---------- API ----------
   app.use('/api/health', healthRoutes);
+  app.use('/api/auth', authRoutes);
   app.use('/api', notFoundApi);
 
   // ---------- Frontend (plain HTML/CSS/JS) ----------
