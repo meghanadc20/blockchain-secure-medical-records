@@ -32,8 +32,9 @@
     <div class="card auth-card">
       <h1>Create a patient account</h1>
       <p class="subtitle">Store your medical records and decide which doctors can see them.</p>
+      <noscript><div class="alert alert-error" role="alert">JavaScript is required to sign in securely. Please enable JavaScript and reload this page.</div></noscript>
       <div id="form-alert" class="alert" hidden></div>
-      <form id="register-form" data-endpoint="/auth/register/patient" novalidate>
+      <form id="register-form" data-endpoint="/auth/register/patient" method="post" action="/register/patient" novalidate>
           <div class="form-group">
             <label for="name">Full name</label>
             <input class="form-control" id="name" name="name" type="text" autocomplete="name" required maxlength="100">
@@ -58,7 +59,7 @@
             <div class="form-hint" id="password-hint">At least 8 characters, with letters and numbers.</div>
             <div class="field-error" data-error-for="password"></div>
           </div>
-        <button class="btn btn-primary btn-block" type="submit">Create patient account</button>
+        <button class="btn btn-primary btn-block" type="submit" disabled data-requires-js>Create patient account</button>
       </form>
       <p class="auth-footer">Already registered? <a href="/login">Log in</a></p>
     </div>

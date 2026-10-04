@@ -32,8 +32,9 @@
     <div class="card auth-card wide">
       <h1>Create a doctor account</h1>
       <p class="subtitle">An administrator verifies your licence before you can access any patient records.</p>
+      <noscript><div class="alert alert-error" role="alert">JavaScript is required to sign in securely. Please enable JavaScript and reload this page.</div></noscript>
       <div id="form-alert" class="alert" hidden></div>
-      <form id="register-form" data-endpoint="/auth/register/doctor" novalidate>
+      <form id="register-form" data-endpoint="/auth/register/doctor" method="post" action="/register/doctor" novalidate>
         <div class="form-row">
           <div class="form-group">
             <label for="name">Full name</label>
@@ -78,7 +79,7 @@
             <input class="form-control" id="hospital" name="hospital" type="text" autocomplete="organization" required maxlength="150">
             <div class="field-error" data-error-for="hospital"></div>
           </div>
-        <button class="btn btn-primary btn-block" type="submit">Submit for verification</button>
+        <button class="btn btn-primary btn-block" type="submit" disabled data-requires-js>Submit for verification</button>
       </form>
       <p class="auth-footer">Already registered? <a href="/login">Log in</a></p>
     </div>

@@ -1,5 +1,22 @@
 // Login and registration pages.
+// Security: credentials are only ever sent with fetch() as a JSON POST body.
+// The forms are method="post" with their submit button disabled in the HTML until this
+// script has attached its handler, so the browser can never fall back to a GET submission
+// that would put credentials in the URL, query string or history.
+
+const SENSITIVE_PARAMS = ['email', 'password', 'name', 'phone', 'specialization', 'licenseNumber', 'hospital'];
+
+/** Removes any form fields that ended up in the address bar (e.g. from an old bookmark) without adding a history entry. */
+function scrubSensitiveParams() {
+  const url = new URL(window.location.href);
+  const hadSensitive = SENSITIVE_PARAMS.some((k) => url.searchParams.has(k));
+  if (!hadSensitive) return;
+  SENSITIVE_PARAMS.forEach((k) => url.searchParams.delete(k));
+  window.history.replaceState(null, '', url.pathname + (url.search ? url.search : '') + url.hash);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  scrubSensitiveParams();
   const alertEl = document.getElementById('form-alert');
 
   // Show/hide password
@@ -29,9 +46,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('login-form') || document.getElementById('register-form');
   if (!form) return;
   const submit = form.querySelector('button[type="submit"]');
+  let inFlight = false;
 
   form.addEventListener('submit', async (e) => {
+    // Always cancel the native submission first, before anything else can throw.
     e.preventDefault();
+    e.stopPropagation();
+    if (inFlight) return;
     UI.hideAlert(alertEl);
     UI.clearFieldErrors(form);
 
@@ -43,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const isLogin = form.id === 'login-form';
+    inFlight = true;
     UI.setLoading(submit, true, isLogin ? 'Logging in…' : 'Creating account…');
     try {
       const data = isLogin
@@ -51,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
       API.Session.save(data.token, data.user);
       window.location.replace(data.redirectTo);
     } catch (err) {
+      inFlight = false;
       UI.setLoading(submit, false);
       if (err.code === 'VALIDATION_ERROR') {
         UI.showFieldErrors(form, err.details);
@@ -66,4 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+
+  // Handler attached — now (and only now) allow submission.
+  form.querySelectorAll('[data-requires-js]').forEach((btn) => { btn.disabled = false; });
 });

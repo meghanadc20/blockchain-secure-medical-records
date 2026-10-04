@@ -32,8 +32,9 @@
     <div class="card auth-card">
       <h1>Log in</h1>
       <p class="subtitle">Patients and doctors sign in here.</p>
+      <noscript><div class="alert alert-error" role="alert">JavaScript is required to sign in securely. Please enable JavaScript and reload this page.</div></noscript>
       <div id="form-alert" class="alert" hidden></div>
-      <form id="login-form" novalidate>
+      <form id="login-form" method="post" action="/login" autocomplete="on" novalidate>
           <div class="form-group">
             <label for="email">Email</label>
             <input class="form-control" id="email" name="email" type="email" autocomplete="email" required maxlength="254">
@@ -47,7 +48,7 @@
             </div>
             <div class="field-error" data-error-for="password"></div>
           </div>
-        <button class="btn btn-primary btn-block" type="submit">Log in</button>
+        <button class="btn btn-primary btn-block" type="submit" disabled data-requires-js>Log in</button>
       </form>
       <p class="auth-footer">New here? <a href="/register/patient">Register as patient</a> · <a href="/register/doctor">Register as doctor</a></p>
     </div>
