@@ -137,3 +137,36 @@ Relation view: `{ id, status, requestedAt, approvedAt, revokedAt, updatedAt, doc
 - Any other transition → `409 INVALID_STATUS_TRANSITION`.
 - A relation belonging to another patient returns `404 RELATION_NOT_FOUND` (does not reveal it exists) and is audited as `ACCESS_DENIED`.
 - Doctors cannot approve their own requests (`403`); admins cannot use these endpoints (`403`).
+
+---
+
+## Medical records — metadata (Module 2)
+
+Record view: `{ id, patientId, title, recordType, description, fileName, mimeType, fileSize, hasFile, sha256Hash, blockchainTransactionHash, uploadedBy: { id, name, role }, createdAt, updatedAt }`.
+Storage paths and encryption parameters are never returned.
+`recordType`: `LAB_REPORT | IMAGING | PRESCRIPTION | DISCHARGE_SUMMARY | CONSULTATION_NOTE | VACCINATION | OTHER`.
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET | `/api/records?type=&q=&page=&limit=` | Patient | Own records, newest first |
+| GET | `/api/records/:recordId` | Owning patient | `404 RECORD_NOT_FOUND` for missing or someone else's record (audited `ACCESS_DENIED`) |
+| PATCH | `/api/records/:recordId` | Owning patient | Editable: `title`, `recordType`, `description`. File/hash fields → `400 FIELD_NOT_EDITABLE`. Audited `RECORD_UPDATED` |
+
+Uploading files (Module 3) and doctor access through permissions (Module 4) are added later.
+
+## Consultations (Module 2)
+
+Consultation view: `{ id, patient: { id, name, email }, doctor: { id, name, specialization, hospital }, recordId, consultationDate, diagnosis, prescription, treatmentNotes, createdAt }`
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| POST | `/api/consultations` | **Verified** doctor with an **APPROVED** relationship to the patient | Body: `patientId`, `consultationDate` (not in the future), at least one of `diagnosis` (≤5000), `prescription` (≤5000), `treatmentNotes` (≤10000); optional `recordId` (must belong to the patient). `403 PERMISSION_DENIED` without an approved relationship. Audited `CONSULTATION_ADDED` (no medical text in the audit log) |
+| GET | `/api/consultations?patientId=&doctorId=&page=&limit=` | Patient: all own (filter `doctorId`). Doctor: only ones they authored, only for patients currently APPROVED (filter `patientId`, `403` if not approved) | Newest first. Doctor reads audited `RECORD_VIEW` |
+| GET | `/api/consultations/:consultationId` | Owning patient, or authoring doctor while APPROVED | Other doctors / patients → `404`. Author after revocation → `403 PERMISSION_REVOKED` |
+
+Consultations are append-only: there are no update or delete endpoints. Corrections are added as a new consultation. Admins have no access.
+
+## Patient history timeline (Module 2)
+
+### `GET /api/history?type=ALL|RECORD|CONSULTATION&from=YYYY-MM-DD&to=YYYY-MM-DD`
+Patient only (own data). Returns `{ items: [{ kind: 'RECORD' | 'CONSULTATION', date, record? , consultation? }], counts: { records, consultations }, truncated }`, newest first (records by upload date, consultations by consultation date; `to` is inclusive). Max 500 items.

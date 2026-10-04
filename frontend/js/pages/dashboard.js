@@ -34,13 +34,16 @@ Layout.ready.then(async ({ user }) => {
     statsEl.innerHTML = UI.state('loading', 'Loading…');
     const pendingEl = document.getElementById('pending');
     try {
-      const [pending, approved] = await Promise.all([
+      const [pending, approved, records, consults] = await Promise.all([
         API.get('/relations/patient?status=PENDING&limit=5'),
         API.get('/relations/patient?status=APPROVED&limit=1'),
+        API.get('/records?limit=1'),
+        API.get('/consultations?limit=1'),
       ]);
       statsEl.innerHTML = statCard('Pending requests', pending.total, '/patient/access-requests')
         + statCard('Authorized doctors', approved.total, '/patient/access-requests')
-        + `<div class="card stat"><span class="stat-label">Medical records</span><span class="muted" style="margin-top:6px">Available with Module 2</span></div>`;
+        + statCard('Medical records', records.total, '/patient/records')
+        + statCard('Consultations', consults.total, '/patient/history');
       pendingEl.innerHTML = pending.items.length
         ? `<ul style="list-style:none;padding:0;margin:0">${pending.items.map((r) => `<li style="padding:10px 0;border-bottom:1px solid var(--border)"><strong>Dr. ${UI.esc(r.doctor.name)}</strong><span class="cell-sub">${UI.esc(r.doctor.specialization || '')} · ${UI.esc(r.doctor.hospital || '')} · requested ${UI.formatDate(r.requestedAt)}</span></li>`).join('')}</ul>`
         : UI.state('empty', 'No pending requests', 'When a doctor asks for access, it will appear here.');

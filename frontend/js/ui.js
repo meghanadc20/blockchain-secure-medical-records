@@ -135,6 +135,66 @@
       });
     },
 
+    /**
+     * Modal containing a form. `bodyHtml` holds the fields; `onSubmit(values, form)` may throw an
+     * API error (field errors are shown inline and the modal stays open). Resolves to the onSubmit result or null.
+     */
+    formModal({ title, bodyHtml, confirmLabel = 'Save' , onSubmit }) {
+      return new Promise((resolve) => {
+        const previous = document.activeElement;
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        backdrop.innerHTML = `
+          <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fm-title">
+            <h2 id="fm-title" style="font-size:1.2rem">${UI.esc(title)}</h2>
+            <div class="alert" id="fm-alert" hidden></div>
+            <form id="fm-form" method="post" action="#" novalidate>${bodyHtml}
+              <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+                <button type="button" class="btn btn-outline" data-act="cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary">${UI.esc(confirmLabel)}</button>
+              </div>
+            </form>
+          </div>`;
+        const form = backdrop.querySelector('#fm-form');
+        const alertEl = backdrop.querySelector('#fm-alert');
+        const close = (result) => {
+          backdrop.remove(); document.removeEventListener('keydown', onKey);
+          if (previous && previous.focus) previous.focus();
+          resolve(result);
+        };
+        const onKey = (e) => { if (e.key === 'Escape') close(null); };
+        backdrop.addEventListener('click', (e) => {
+          if (e.target === backdrop || (e.target.closest('[data-act="cancel"]'))) close(null);
+        });
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          UI.hideAlert(alertEl); UI.clearFieldErrors(form);
+          const btn = form.querySelector('button[type="submit"]');
+          UI.setLoading(btn, true, 'Saving…');
+          try { close(await onSubmit(UI.formData(form), form)); } catch (err) {
+            UI.setLoading(btn, false);
+            if (err.details) UI.showFieldErrors(form, err.details);
+            UI.showAlert(alertEl, 'error', err.message || 'Something went wrong.');
+          }
+        });
+        document.addEventListener('keydown', onKey);
+        document.body.appendChild(backdrop);
+        const first = form.querySelector('input, select, textarea'); if (first) first.focus();
+      });
+    },
+
+    RECORD_TYPES: { LAB_REPORT: 'Lab report', IMAGING: 'Imaging', PRESCRIPTION: 'Prescription', DISCHARGE_SUMMARY: 'Discharge summary', CONSULTATION_NOTE: 'Consultation note', VACCINATION: 'Vaccination', OTHER: 'Other' },
+
+    formatBytes(n) {
+      if (n === null || n === undefined) return '—';
+      const u = ['B', 'KB', 'MB', 'GB']; let i = 0; let v = n;
+      while (v >= 1024 && i < u.length - 1) { v /= 1024; i += 1; }
+      return `${v.toFixed(i ? 1 : 0)} ${u[i]}`;
+    },
+
+    /** Multi-line text → safe HTML with line breaks. */
+    multiline(text) { return UI.esc(text).replace(/\n/g, '<br>'); },
+
     /** Renders a simple data table. columns: [{ label, render(row) → HTML string }] */
     table(columns, rows, { caption } = {}) {
       return `<div class="table-wrap"><table class="table">${caption ? `<caption class="sr-only">${UI.esc(caption)}</caption>` : ''}

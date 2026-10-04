@@ -8,6 +8,9 @@ const authRoutes = require('./routes/auth.routes');
 const profileRoutes = require('./routes/profile.routes');
 const adminRoutes = require('./routes/admin.routes');
 const relationRoutes = require('./routes/relation.routes');
+const recordRoutes = require('./routes/record.routes');
+const consultationRoutes = require('./routes/consultation.routes');
+const historyRoutes = require('./routes/history.routes');
 const { notFoundApi, errorHandler } = require('./middleware/errorHandler');
 
 const FRONTEND_DIR = path.resolve(__dirname, '../../frontend');
@@ -35,6 +38,9 @@ function createApp() {
   app.use('/api/profile', profileRoutes);
   app.use('/api/admin', adminRoutes);
   app.use('/api/relations', relationRoutes);
+  app.use('/api/records', recordRoutes);
+  app.use('/api/consultations', consultationRoutes);
+  app.use('/api/history', historyRoutes);
   app.use('/api', notFoundApi);
 
   // ---------- Frontend (plain HTML/CSS/JS) ----------

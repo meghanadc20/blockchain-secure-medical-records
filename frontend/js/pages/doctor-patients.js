@@ -15,6 +15,7 @@ Layout.ready.then(async ({ user }) => {
         { label: 'Email', render: (r) => UI.esc(r.patient.email) },
         { label: 'Approved', render: (r) => UI.formatDate(r.approvedAt, true) },
         { label: 'Status', render: (r) => UI.badge(r.status) },
+        { label: 'Actions', render: (r) => `<a class="btn btn-outline btn-sm" href="/doctor/consultations?patient=${encodeURIComponent(r.patient.id)}">Add consultation</a>` },
       ], data.items, { caption: 'Patients who approved access' })
       : UI.state('empty', 'No patients yet', 'Patients appear here after they approve your access request.');
   } catch (err) {

@@ -14,12 +14,32 @@
 <body data-role="DOCTOR" data-page="consultations" data-title="Consultations">
   <div id="app-root"><div class="app-loading"><div class="state" role="status"><div class="spinner" aria-hidden="true"></div>Loading…</div></div></div>
   <template id="page-content">
-    <div class="page-header"><div><h1>Consultations</h1><p>Diagnoses, prescriptions and treatment notes you have added.</p></div></div>
-    <div class="card"><div class="state"><div class="state-title">Not available yet</div><div>This section is delivered with Module 2 (medical records and patient history). Nothing is shown here until it is built.</div></div></div>
+    <div class="page-header"><div><h1>Consultations</h1><p>Record diagnoses, prescriptions and treatment notes for patients who have approved your access. Entries cannot be edited later — add a new consultation to correct or follow up.</p></div></div>
+    <div id="verify-alert" class="alert" hidden></div>
+    <section class="card" aria-labelledby="new-title" style="margin-bottom:20px">
+      <h2 class="card-title" id="new-title" style="margin-bottom:12px">New consultation</h2>
+      <div id="form-alert" class="alert" hidden></div>
+      <form id="consult-form" method="post" action="#" novalidate>
+        <div class="form-row">
+          <div class="form-group"><label for="patientId">Patient</label><select class="form-control" id="patientId" name="patientId" required><option value="">Loading patients…</option></select><div class="field-error" data-error-for="patientId"></div></div>
+          <div class="form-group"><label for="consultationDate">Consultation date</label><input class="form-control" id="consultationDate" name="consultationDate" type="date" required><div class="field-error" data-error-for="consultationDate"></div></div>
+        </div>
+        <div class="form-group"><label for="diagnosis">Diagnosis</label><textarea class="form-control" id="diagnosis" name="diagnosis" rows="2" maxlength="5000"></textarea><div class="field-error" data-error-for="diagnosis"></div></div>
+        <div class="form-group"><label for="prescription">Prescription</label><textarea class="form-control" id="prescription" name="prescription" rows="2" maxlength="5000" placeholder="Medicine, dose, frequency, duration"></textarea><div class="field-error" data-error-for="prescription"></div></div>
+        <div class="form-group"><label for="treatmentNotes">Treatment notes</label><textarea class="form-control" id="treatmentNotes" name="treatmentNotes" rows="3" maxlength="10000"></textarea><div class="field-error" data-error-for="treatmentNotes"></div></div>
+        <p class="form-hint" style="margin-top:-6px;margin-bottom:12px">At least one of diagnosis, prescription or treatment notes is required.</p>
+        <button class="btn btn-primary" type="submit" disabled data-requires-js>Save consultation</button>
+      </form>
+    </section>
+    <section aria-labelledby="list-title">
+      <div class="toolbar"><h2 class="card-title" id="list-title">My consultations</h2>
+        <div><label class="sr-only" for="filter-patient">Filter by patient</label><select class="form-control" id="filter-patient"><option value="">All patients</option></select></div></div>
+      <div id="list"></div>
+    </section>
   </template>
   <script src="/js/api.js" defer></script>
   <script src="/js/ui.js" defer></script>
   <script src="/js/layout.js" defer></script>
-
+  <script src="/js/pages/consultations-doctor.js" defer></script>
 </body>
 </html>

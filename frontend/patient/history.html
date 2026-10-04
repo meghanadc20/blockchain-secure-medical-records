@@ -14,12 +14,19 @@
 <body data-role="PATIENT" data-page="history" data-title="Medical History">
   <div id="app-root"><div class="app-loading"><div class="state" role="status"><div class="spinner" aria-hidden="true"></div>Loading…</div></div></div>
   <template id="page-content">
-    <div class="page-header"><div><h1>Medical History</h1><p>A timeline of your records and consultations.</p></div></div>
-    <div class="card"><div class="state"><div class="state-title">Not available yet</div><div>This section is delivered with Module 2 (medical records and patient history). Nothing is shown here until it is built.</div></div></div>
+    <div class="page-header"><div><h1>Medical history</h1><p>Your records and consultations in one timeline, newest first.</p></div></div>
+    <form id="filters" class="card toolbar" style="padding:16px" method="get" action="#" novalidate>
+      <div class="form-group" style="margin:0"><label for="type">Show</label><select class="form-control" id="type" name="type"><option value="ALL">Everything</option><option value="CONSULTATION">Consultations</option><option value="RECORD">Records</option></select></div>
+      <div class="form-group" style="margin:0"><label for="from">From</label><input class="form-control" id="from" name="from" type="date"></div>
+      <div class="form-group" style="margin:0"><label for="to">To</label><input class="form-control" id="to" name="to" type="date"></div>
+      <div style="display:flex;gap:8px;align-self:flex-end"><button class="btn btn-primary" type="submit">Apply</button><button class="btn btn-outline" type="reset">Clear</button></div>
+    </form>
+    <div id="summary" class="muted" style="margin:16px 0 8px"></div>
+    <ol id="timeline" class="timeline"></ol>
   </template>
   <script src="/js/api.js" defer></script>
   <script src="/js/ui.js" defer></script>
   <script src="/js/layout.js" defer></script>
-
+  <script src="/js/pages/history.js" defer></script>
 </body>
 </html>

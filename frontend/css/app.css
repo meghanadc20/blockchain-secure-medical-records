@@ -67,3 +67,23 @@
   .table td::before { content: attr(data-label); display: block; font-size: .75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
 }
 .modal #modal-desc { white-space: pre-line; }
+
+/* Timeline */
+.timeline { list-style: none; margin: 0; padding: 0 0 0 22px; border-left: 2px solid var(--border); }
+.timeline-item { position: relative; margin: 0 0 18px; }
+.timeline-item::before { content: ''; position: absolute; left: -30px; top: 22px; width: 12px; height: 12px; border-radius: 50%; background: var(--card); border: 3px solid var(--primary); }
+.timeline-item.kind-RECORD::before { border-color: var(--secondary); }
+.timeline-date { font-size: .82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+.clinical { display: grid; gap: 12px; margin-top: 12px; }
+.clinical h4 { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin: 0 0 2px; }
+.clinical p { margin: 0; }
+
+/* Record cards */
+.record-card { display: flex; flex-direction: column; gap: 12px; }
+.record-card h3 { font-size: 1.05rem; margin: 0; }
+.record-meta { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: .9rem; margin: 0; }
+.record-meta dt { color: var(--text-muted); }
+.record-meta dd { margin: 0; }
+textarea.form-control { resize: vertical; min-height: 64px; }
+.filter-row { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; }
+.filter-row .form-control { flex: 1 1 200px; max-width: 320px; }
