@@ -20,7 +20,9 @@ Layout.ready.then(({ user }) => {
   async function load() {
     listEl.innerHTML = UI.state('loading', 'Loading records…');
     try {
+      const want = current; // ignore responses for a tab the user has already left
       const data = await API.get(`/permissions/doctor?status=${current}&limit=100`);
+      if (want !== current) return;
       UI.syncServerTime(data.serverTime);
       if (!data.items.length) {
         listEl.innerHTML = UI.state('empty', { ACTIVE: 'No active access', EXPIRED: 'No expired access', REVOKED: 'No revoked access' }[current],

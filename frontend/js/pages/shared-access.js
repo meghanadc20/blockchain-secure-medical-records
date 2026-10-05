@@ -23,7 +23,9 @@ Layout.ready.then(() => {
   async function load() {
     listEl.innerHTML = UI.state('loading', 'Loading shares…');
     try {
+      const want = current; // ignore responses for a tab the user has already left
       const data = await API.get(`/permissions?status=${current}&limit=100`);
+      if (want !== current) return;
       UI.syncServerTime(data.serverTime);
       items = data.items;
       if (!items.length) {
