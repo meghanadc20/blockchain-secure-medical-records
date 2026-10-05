@@ -1,6 +1,6 @@
-# Blockchain-Based Secure Medical Data Sharing System
+# MedChain — Blockchain-Based Secure Medical Record Sharing System
 
-A patient-controlled platform for secure, auditable and integrity-verified medical data sharing.
+**MedChain** is a patient-controlled platform for secure, auditable and integrity-verified medical record sharing.
 
 | Layer | Technology |
 |---|---|

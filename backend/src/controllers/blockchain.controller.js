@@ -13,7 +13,7 @@ const AUDIENCE = 'wallet-link';
 
 function linkMessage(user, address, nonce) {
   return [
-    'Secure Medical Data Sharing — link wallet',
+    'MedChain — link wallet',
     '',
     `Account: ${user.email}`,
     `Wallet: ${getAddress(address)}`,

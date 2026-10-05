@@ -1,4 +1,4 @@
-# Setup
+# MedChain — Setup
 
 ## Prerequisites
 - Node.js 22 LTS or newer and npm

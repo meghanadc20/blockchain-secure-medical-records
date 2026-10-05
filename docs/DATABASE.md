@@ -1,4 +1,4 @@
-# Database (MongoDB Atlas + Mongoose)
+# MedChain — Database (MongoDB Atlas + Mongoose)
 
 Follows the Backend Schema document. Field names are unchanged; approved **additions** are marked ➕.
 

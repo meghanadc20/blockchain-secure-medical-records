@@ -1,4 +1,4 @@
-# API Reference
+# MedChain — API Reference
 
 Base URL: `/api`
 

@@ -1,7 +1,7 @@
 {
   "name": "medical-data-sharing-backend",
   "version": "0.1.0",
-  "description": "Express API for the Blockchain-Based Secure Medical Data Sharing System",
+  "description": "Express API for MedChain — Blockchain-Based Secure Medical Record Sharing System",
   "main": "server.js",
   "private": true,
   "scripts": {

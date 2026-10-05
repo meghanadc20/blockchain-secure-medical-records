@@ -1,4 +1,4 @@
-# Blockchain layer (Module 5)
+# MedChain — Blockchain layer (Module 5)
 
 **Network:** a LOCAL Ganache test chain only (chainId 1337, `http://127.0.0.1:8545`). No real network, no real funds.
 The deploy script and the backend's test-ether funding refuse to run on any chain other than 1337/31337.
