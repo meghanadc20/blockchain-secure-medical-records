@@ -25,11 +25,13 @@ Layout.ready.then(async ({ user }) => {
       const [approved, pending, shared] = await Promise.all([
         API.get('/relations/doctor?status=APPROVED&limit=1'),
         API.get('/relations/doctor?status=PENDING&limit=1'),
-        p.verificationStatus === 'APPROVED' ? API.get('/permissions/doctor?status=ACTIVE&limit=1') : Promise.resolve({ total: 0 }),
+        p.verificationStatus === 'APPROVED' ? API.get('/permissions/doctor/summary') : Promise.resolve({ active: 0, expiringSoon: 0 }),
       ]);
+      shared.total = shared.active;
       statsEl.innerHTML = statCard('Patients who approved you', approved.total, '/doctor/patients')
         + statCard('Requests awaiting patients', pending.total, '/doctor/access-requests')
         + statCard('Records shared with you (active)', shared.total, '/doctor/records');
+      if (shared.expiringSoon) statsEl.insertAdjacentHTML('afterend', `<div class="alert alert-warning" id="expiring-alert">${shared.expiringSoon} shared record(s) expire within 24 hours. <a href="/doctor/records">View</a></div>`);
     } catch (err) { statsEl.innerHTML = UI.state('error', 'Could not load summary', err.message); }
   } else {
     statsEl.innerHTML = UI.state('loading', 'Loading…');
@@ -41,6 +43,9 @@ Layout.ready.then(async ({ user }) => {
         API.get('/records?limit=1'),
         API.get('/consultations?limit=1'),
       ]);
+      API.get('/permissions/summary').then((sum) => {
+        if (sum.expiringSoon) statsEl.insertAdjacentHTML('afterend', `<div class="alert alert-warning" id="expiring-alert">${sum.expiringSoon} of your ${sum.active} active share(s) expire within 24 hours. <a href="/patient/shared">Review shared access</a></div>`);
+      }).catch(() => {});
       statsEl.innerHTML = statCard('Pending requests', pending.total, '/patient/access-requests')
         + statCard('Authorized doctors', approved.total, '/patient/access-requests')
         + statCard('Medical records', records.total, '/patient/records')

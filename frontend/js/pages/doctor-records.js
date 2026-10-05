@@ -21,6 +21,7 @@ Layout.ready.then(({ user }) => {
     listEl.innerHTML = UI.state('loading', 'Loading records…');
     try {
       const data = await API.get(`/permissions/doctor?status=${current}&limit=100`);
+      UI.syncServerTime(data.serverTime);
       if (!data.items.length) {
         listEl.innerHTML = UI.state('empty', { ACTIVE: 'No active access', EXPIRED: 'No expired access', REVOKED: 'No revoked access' }[current],
           current === 'ACTIVE' ? 'When a patient shares a record with you, it appears here until it expires.' : '');
@@ -30,13 +31,14 @@ Layout.ready.then(({ user }) => {
         { label: 'Record', render: (p) => `<strong>${UI.esc(p.record.title || 'Record')}</strong><span class="cell-sub">${UI.esc(UI.RECORD_TYPES[p.record.recordType] || '')}${p.record.fileName ? ` · ${UI.esc(p.record.fileName)}` : ''}</span>` },
         { label: 'Patient', render: (p) => UI.esc(p.patient.name) },
         { label: 'Granted', render: (p) => UI.formatDate(p.grantedAt, true) },
-        { label: 'Expires', render: (p) => `${UI.formatDate(p.expiresAt, true)}<span class="cell-sub">${p.status === 'ACTIVE' ? UI.relativeTime(p.expiresAt) : ''}</span>` },
-        { label: 'Status', render: (p) => `${UI.badge(p.status)}<div style="margin-top:4px">${UI.chainBadge(p.blockchainTransactionHash, 'Grant')}</div>` },
+        { label: 'Expires', render: (p) => `${UI.formatDate(p.expiresAt, true)}<span class="cell-sub">${p.status === 'ACTIVE' ? UI.countdown(p.expiresAt) : ''}</span>` },
+        { label: 'Status', render: (p) => `${UI.permissionBadge(p)}<div style="margin-top:4px">${UI.chainBadge(p.blockchainTransactionHash, 'Grant')}</div>` },
         { label: 'Integrity', render: (p) => UI.integrityBadge(p.record.lastIntegrityCheck) },
         { label: 'Actions', render: (p) => (p.status === 'ACTIVE' && p.record.hasFile
           ? `<div class="actions"><button class="btn btn-primary btn-sm" data-view="${p.record.id}">View</button><button class="btn btn-outline btn-sm" data-download="${p.record.id}">Download</button><button class="btn btn-outline btn-sm" data-verify="${p.record.id}" data-title="${UI.esc(p.record.title)}">Verify</button></div>`
           : '<span class="muted">—</span>') },
       ], data.items, { caption: `${current} shared records` });
+      UI.tickCountdowns();
     } catch (err) {
       listEl.innerHTML = UI.state('error', 'Could not load records', err.message);
     }
@@ -55,5 +57,7 @@ Layout.ready.then(({ user }) => {
     tabs.forEach((x) => x.setAttribute('aria-selected', String(x === t)));
     current = t.dataset.status; load(); counts();
   }));
+  // A share that reaches its expiry while the page is open moves to "Expired" without a reload.
+  document.addEventListener('access-expired', () => setTimeout(() => { load(); counts(); }, 1500));
   load(); counts();
 });

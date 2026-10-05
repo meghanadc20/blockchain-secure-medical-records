@@ -304,7 +304,45 @@
     },
 
     /** Expiry presets for sharing (value = minutes). */
-    EXPIRY_PRESETS: [[60, '1 hour'], [1440, '24 hours'], [10080, '7 days'], [43200, '30 days'], ['custom', 'Custom date & time…']],
+    EXPIRY_PRESETS: [[15, '15 minutes'], [60, '1 hour'], [1440, '24 hours'], [10080, '7 days'], [43200, '30 days'], ['custom', 'Custom date & time…']],
+
+    /* ---------- time-limited access: live countdowns ---------- */
+    serverOffsetMs: 0,
+    /** Call with a response's serverTime so countdowns follow the server clock, not the PC clock. */
+    syncServerTime(serverTime) { if (serverTime) UI.serverOffsetMs = new Date(serverTime).getTime() - Date.now(); },
+    serverNow() { return Date.now() + UI.serverOffsetMs; },
+
+    formatRemaining(ms) {
+      if (ms <= 0) return 'Expired';
+      const s = Math.floor(ms / 1000); const d = Math.floor(s / 86400); const h = Math.floor((s % 86400) / 3600);
+      const m = Math.floor((s % 3600) / 60); const sec = s % 60;
+      if (d) return `${d}d ${h}h left`;
+      if (h) return `${h}h ${m}m left`;
+      return `${m}m ${String(sec).padStart(2, '0')}s left`;
+    },
+
+    /** Live countdown element. When it reaches zero it flips to "Expired" and fires 'access-expired'. */
+    countdown(expiresAt) {
+      return `<span class="countdown" data-expires="${UI.esc(new Date(expiresAt).toISOString())}" aria-live="off"></span>`;
+    },
+
+    tickCountdowns() {
+      let expiredNow = false;
+      document.querySelectorAll('[data-expires]').forEach((el) => {
+        const ms = new Date(el.dataset.expires).getTime() - UI.serverNow();
+        el.textContent = UI.formatRemaining(ms);
+        el.classList.toggle('countdown-soon', ms > 0 && ms <= 24 * 3600 * 1000);
+        el.classList.toggle('countdown-urgent', ms > 0 && ms <= 3600 * 1000);
+        el.classList.toggle('countdown-expired', ms <= 0);
+        if (ms <= 0 && !el.dataset.fired) { el.dataset.fired = '1'; expiredNow = true; }
+      });
+      if (expiredNow) document.dispatchEvent(new CustomEvent('access-expired'));
+    },
+
+    /** Status badge for a permission: ACTIVE (+ EXPIRING SOON), EXPIRED, REVOKED. */
+    permissionBadge(p) {
+      return `${UI.badge(p.status)}${p.status === 'ACTIVE' && p.expiringSoon ? ' <span class="badge badge-warning">Expiring soon</span>' : ''}`;
+    },
 
     shortHash(h) { return h ? `${h.slice(0, 10)}…${h.slice(-6)}` : '—'; },
 
@@ -325,3 +363,6 @@
   };
   window.UI = UI;
 })();
+
+// Countdown ticker (1 s) — only does work when countdowns are on the page.
+setInterval(() => { if (document.querySelector('[data-expires]')) UI.tickCountdowns(); }, 1000);

@@ -16,6 +16,7 @@ const { anchorRecord } = require('../services/anchor.service');
 
 const MIN_DURATION_MS = 5 * 60 * 1000;            // 5 minutes
 const MAX_DURATION_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
+const EXPIRING_SOON_MS = 24 * 60 * 60 * 1000;      // "expiring soon" = within 24 hours
 
 function toView(p, now = new Date()) {
   const rec = p.recordId && p.recordId.title ? p.recordId : null;
@@ -24,6 +25,8 @@ function toView(p, now = new Date()) {
   return {
     id: String(p._id),
     status: effectiveStatus(p, now),            // ACTIVE | EXPIRED | REVOKED
+    secondsRemaining: effectiveStatus(p, now) === 'ACTIVE' ? Math.max(0, Math.floor((new Date(p.expiresAt) - now) / 1000)) : 0,
+    expiringSoon: effectiveStatus(p, now) === 'ACTIVE' && new Date(p.expiresAt) - now <= EXPIRING_SOON_MS,
     storedStatus: p.status,                     // GRANTED | EXPIRED | REVOKED (as in the database)
     grantedAt: p.grantedAt,
     expiresAt: p.expiresAt,
@@ -45,7 +48,8 @@ function statusFilter(raw) {
   if (s === 'ACTIVE') return { status: PERMISSION_STATUS.GRANTED, expiresAt: { $gt: now } };
   if (s === 'EXPIRED') return { $or: [{ status: PERMISSION_STATUS.EXPIRED }, { status: PERMISSION_STATUS.GRANTED, expiresAt: { $lte: now } }] };
   if (s === 'REVOKED') return { status: PERMISSION_STATUS.REVOKED };
-  throw ApiError.badRequest('status must be ACTIVE, EXPIRED or REVOKED', 'VALIDATION_ERROR');
+  if (s === 'EXPIRING') return { status: PERMISSION_STATUS.GRANTED, expiresAt: { $gt: now, $lte: new Date(now.getTime() + EXPIRING_SOON_MS) } };
+  throw ApiError.badRequest('status must be ACTIVE, EXPIRING, EXPIRED or REVOKED', 'VALIDATION_ERROR');
 }
 
 /**
@@ -175,6 +179,10 @@ async function loadOwnGrantedPermission(req) {
   if (perm.status !== PERMISSION_STATUS.GRANTED) {
     throw ApiError.conflict(`This permission is already ${perm.status.toLowerCase()}.`, 'INVALID_STATUS_TRANSITION');
   }
+  if (new Date(perm.expiresAt) <= new Date()) {
+    await markExpired(perm, { req });
+    throw ApiError.conflict('This permission has already expired, so there is nothing to revoke.', 'PERMISSION_EXPIRED');
+  }
   return perm;
 }
 
@@ -239,7 +247,7 @@ async function listForPatient(req, res) {
     AccessPermission.countDocuments(filter),
   ]);
   const now = new Date();
-  res.json({ success: true, data: paginated(items.map((p) => toView(p, now)), total, pg) });
+  res.json({ success: true, data: { ...paginated(items.map((p) => toView(p, now)), total, pg), serverTime: now } });
 }
 
 /**
@@ -258,11 +266,29 @@ async function listForDoctor(req, res) {
   const now = new Date();
   const { latestIntegrityChecks } = require('../services/integrityStatus.service');
   const checks = await latestIntegrityChecks(items.map((p) => (p.recordId && p.recordId._id) || p.recordId));
-  res.json({ success: true, data: paginated(items.map((p) => {
+  res.json({ success: true, data: { ...paginated(items.map((p) => {
     const v = toView(p, now);
     v.record.lastIntegrityCheck = checks.get(v.record.id) || null;
     return v;
-  }), total, pg) });
+  }), total, pg), serverTime: now } });
 }
 
-module.exports = { prepareGrant, grant, prepareRevoke, revoke, listForPatient, listForDoctor, toView, requireLinkedWallet };
+/** GET /api/permissions/summary (patient) and /api/permissions/doctor/summary (doctor): counts for dashboards. */
+function summary(scope) {
+  return async function permissionSummary(req, res) {
+    const base = scope === 'doctor' ? { doctorId: req.user._id } : { patientId: req.user._id };
+    if (scope === 'doctor') {
+      const DoctorPatientRelation = require('../models/DoctorPatientRelation');
+      base.patientId = { $in: await DoctorPatientRelation.find({ doctorId: req.user._id, status: 'APPROVED' }).distinct('patientId') };
+    }
+    const now = new Date();
+    const [active, expiringSoon, next] = await Promise.all([
+      AccessPermission.countDocuments({ ...base, ...statusFilter('ACTIVE') }),
+      AccessPermission.countDocuments({ ...base, ...statusFilter('EXPIRING') }),
+      AccessPermission.findOne({ ...base, ...statusFilter('ACTIVE') }).sort({ expiresAt: 1 }).select('expiresAt').lean(),
+    ]);
+    res.json({ success: true, data: { active, expiringSoon, nextExpiry: next ? next.expiresAt : null, serverTime: now } });
+  };
+}
+
+module.exports = { summary, prepareGrant, grant, prepareRevoke, revoke, listForPatient, listForDoctor, toView, requireLinkedWallet };

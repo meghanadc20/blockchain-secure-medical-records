@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Shared Access · Secure Medical Data Sharing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body data-role="PATIENT" data-page="shared" data-title="Shared Access">
+  <div id="app-root"><div class="app-loading"><div class="state" role="status"><div class="spinner" aria-hidden="true"></div>Loading…</div></div></div>
+  <template id="page-content">
+    <div class="page-header"><div><h1>Shared access</h1><p>Every record you have shared, with whom, and until when. Access ends automatically at the expiry time — on the blockchain and in the app.</p></div>
+      <a class="btn btn-primary" href="/patient/records">Share a record</a></div>
+    <div class="grid grid-3" id="summary" style="margin-bottom:20px"></div>
+    <div class="tabs" role="tablist" aria-label="Access status">
+      <button class="tab" role="tab" aria-selected="true" data-status="ACTIVE">Active<span class="count" data-count="ACTIVE">0</span></button>
+      <button class="tab" role="tab" aria-selected="false" data-status="EXPIRING">Expiring within 24 h<span class="count" data-count="EXPIRING">0</span></button>
+      <button class="tab" role="tab" aria-selected="false" data-status="EXPIRED">Expired<span class="count" data-count="EXPIRED">0</span></button>
+      <button class="tab" role="tab" aria-selected="false" data-status="REVOKED">Revoked<span class="count" data-count="REVOKED">0</span></button>
+    </div>
+    <div id="list" role="tabpanel"></div>
+  </template>
+  <script src="/js/api.js" defer></script>
+  <script src="/js/ui.js" defer></script>
+  <script src="/js/layout.js" defer></script>
+  <script src="/js/vendor/ethers.umd.min.js" defer></script>
+  <script src="/js/wallet.js" defer></script>
+  <script src="/js/sharing.js" defer></script>
+  <script src="/js/pages/shared-access.js" defer></script>
+</body>
+</html>

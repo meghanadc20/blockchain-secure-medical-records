@@ -19,6 +19,7 @@
     check: '<path d="M20 6L9 17l-5-5"/>',
     x: '<path d="M18 6L6 18M6 6l12 12"/>',
     hourglass: '<path d="M6 2h12M6 22h12M7 2c0 6 10 6 10 10S7 16 7 22M17 2c0 6-10 6-10 10s10 4 10 10"/>',
+    share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>',
     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/>',
   };
 
@@ -29,6 +30,7 @@
       ['records', 'Medical Records', '/patient/records', 'file'],
       ['history', 'Medical History', '/patient/history', 'clock'],
       ['access-requests', 'Access Requests', '/patient/access-requests', 'key'],
+      ['shared', 'Shared Access', '/patient/shared', 'share'],
       ['audit', 'Audit Trail', '/patient/audit', 'list'],
     ],
     DOCTOR: [

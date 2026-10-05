@@ -87,3 +87,9 @@
 textarea.form-control { resize: vertical; min-height: 64px; }
 .filter-row { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; }
 .filter-row .form-control { flex: 1 1 200px; max-width: 320px; }
+
+/* Countdowns for time-limited access */
+.countdown { display: inline-block; font-variant-numeric: tabular-nums; font-size: .85rem; font-weight: 600; color: var(--success); }
+.countdown-soon { color: var(--warning); }
+.countdown-urgent { color: var(--error); }
+.countdown-expired { color: var(--text-muted); }

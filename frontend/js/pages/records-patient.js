@@ -122,65 +122,47 @@ Layout.ready.then(() => {
       return;
     }
     const docOpts = doctors.map((d) => `<option value="${d.doctor.id}">Dr. ${UI.esc(d.doctor.name)} — ${UI.esc(d.doctor.specialization || '')}</option>`).join('');
-    const presetOpts = UI.EXPIRY_PRESETS.map(([v, l]) => `<option value="${v}" ${v === 1440 ? 'selected' : ''}>${l}</option>`).join('');
     const saved = await UI.formModal({
       title: `Share “${r.title}”`,
       confirmLabel: 'Grant access',
       bodyHtml: `<div class="form-group"><label for="s-doc">Doctor</label><select class="form-control" id="s-doc" name="doctorId"><option value="">Select a doctor…</option>${docOpts}</select><div class="field-error" data-error-for="doctorId"></div></div>
-        <div class="form-group"><label for="s-preset">Access expires after</label><select class="form-control" id="s-preset" name="preset">${presetOpts}</select></div>
-        <div class="form-group" id="s-custom-wrap" hidden><label for="s-custom">Expires at</label><input class="form-control" id="s-custom" name="custom" type="datetime-local"></div>
-        <div class="field-error" data-error-for="expiresAt"></div>
+        ${Sharing.expiryFieldsHtml('s')}
         <p class="form-hint">Only this record is shared, only with this doctor, and access ends automatically at the expiry time. You can revoke it earlier at any time.</p>`,
       onSubmit: async (v) => {
         const errs = [];
         if (!v.doctorId) errs.push({ field: 'doctorId', message: 'Select a doctor' });
-        let expiresAt;
-        if (v.preset === 'custom') {
-          if (!v.custom) errs.push({ field: 'expiresAt', message: 'Choose the expiry date and time' });
-          else expiresAt = new Date(v.custom).toISOString();
-        } else expiresAt = new Date(Date.now() + Number(v.preset) * 60000).toISOString();
+        const expiresAt = Sharing.expiryFrom(v.preset, v.custom);
+        if (!expiresAt) errs.push({ field: 'expiresAt', message: 'Choose the expiry date and time' });
         if (errs.length) { const e = new Error('Please correct the highlighted fields.'); e.details = errs; throw e; }
-        // 1) backend validates and says exactly what to sign  2) patient signs grantAccess in MetaMask
-        // 3) backend verifies the mined transaction before storing the permission.
         const submit = document.querySelector('#fm-form button[type="submit"]');
         const step = (t) => { if (submit) submit.innerHTML = `<span class="spinner spinner-sm" aria-hidden="true"></span> ${UI.esc(t)}`; };
-        step('Preparing…');
-        const prep = await API.post('/permissions/prepare', { recordId: r.id, doctorId: v.doctorId, expiresAt });
-        const txHash = await Wallet.sendPrepared(prep, step);
-        return API.post('/permissions', { recordId: r.id, doctorId: v.doctorId, expiresAt: prep.expiresAt, txHash });
+        return Sharing.grant({ recordId: r.id, doctorId: v.doctorId, expiresAt }, step);
       },
     });
     if (saved) { UI.toast(`Shared with Dr. ${saved.permission.doctor.name} until ${UI.formatDate(saved.permission.expiresAt, true)} — recorded on the blockchain.`); load(); }
   }
-  // Show the custom date field when "Custom" is chosen (modal is created dynamically).
-  document.addEventListener('change', (e) => {
-    if (e.target && e.target.id === 's-preset') {
-      const wrap = document.getElementById('s-custom-wrap');
-      wrap.hidden = e.target.value !== 'custom';
-      if (!wrap.hidden) {
-        const min = new Date(Date.now() + 10 * 60000); min.setSeconds(0, 0);
-        const local = new Date(min.getTime() - min.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-        const input = document.getElementById('s-custom'); input.min = local; if (!input.value) input.value = local;
-      }
-    }
-  });
-
   async function manageAccess(r) {
     const dlg = UI.dialog({ title: `Access to “${r.title}”`, bodyHtml: UI.state('loading', 'Loading…'), wide: true });
     async function render() {
       try {
         const data = await API.get(`/permissions?recordId=${r.id}&limit=100`);
+        UI.syncServerTime(data.serverTime);
         dlg.el.innerHTML = data.items.length ? UI.table([
           { label: 'Doctor', render: (p) => `<strong>Dr. ${UI.esc(p.doctor.name)}</strong><span class="cell-sub">${UI.esc(p.doctor.email)}</span>` },
           { label: 'Granted', render: (p) => UI.formatDate(p.grantedAt, true) },
-          { label: 'Expires', render: (p) => `${UI.formatDate(p.expiresAt, true)}<span class="cell-sub">${p.status === 'ACTIVE' ? UI.relativeTime(p.expiresAt) : ''}</span>` },
-          { label: 'Status', render: (p) => `${UI.badge(p.status)}${p.revokedAt ? `<span class="cell-sub">Revoked ${UI.formatDate(p.revokedAt, true)}</span>` : ''}` },
+          { label: 'Expires', render: (p) => `${UI.formatDate(p.expiresAt, true)}<span class="cell-sub">${p.status === 'ACTIVE' ? UI.countdown(p.expiresAt) : ''}</span>` },
+          { label: 'Status', render: (p) => `${UI.permissionBadge(p)}${p.revokedAt ? `<span class="cell-sub">Revoked ${UI.formatDate(p.revokedAt, true)}</span>` : ''}` },
           { label: 'Blockchain', render: (p) => `${UI.chainBadge(p.blockchainTransactionHash, 'Grant')}${p.revokeTransactionHash ? `<div style="margin-top:4px">${UI.chainBadge(p.revokeTransactionHash, 'Revoke')}</div>` : ''}` },
           { label: 'Action', render: (p) => (p.status === 'ACTIVE' ? `<button class="btn btn-danger btn-sm" data-revoke="${p.id}">Revoke</button>` : '<span class="muted">—</span>') },
         ], data.items, { caption: 'Access history for this record' })
           : UI.state('empty', 'Not shared yet', 'Use “Share” to give an authorized doctor time-limited access.');
+        dlg.el.insertAdjacentHTML('beforeend', '<p style="margin:14px 0 0"><a href="/patient/shared">Manage all shared access →</a></p>');
+        UI.tickCountdowns();
       } catch (err) { dlg.el.innerHTML = UI.state('error', 'Could not load access', err.message); }
     }
+    const onExpired = () => render();
+    document.addEventListener('access-expired', onExpired);
+    dlg.closed.then(() => document.removeEventListener('access-expired', onExpired));
     dlg.el.addEventListener('click', async (e) => {
       const b = e.target.closest('[data-revoke]');
       if (!b) return;
@@ -188,10 +170,8 @@ Layout.ready.then(() => {
       if (!confirmed) return;
       UI.setLoading(b, true, 'Preparing…');
       try {
-        const prep = await API.get(`/permissions/${b.dataset.revoke}/revoke/prepare`);
-        const body = prep.needsChainTx ? { txHash: await Wallet.sendPrepared(prep, (t) => UI.setLoading(b, true, t)) } : {};
-        await API.patch(`/permissions/${b.dataset.revoke}/revoke`, body);
-        UI.toast(prep.needsChainTx ? 'Access revoked and recorded on the blockchain.' : 'Access revoked.');
+        const res = await Sharing.revoke(b.dataset.revoke, (t) => UI.setLoading(b, true, t));
+        UI.toast(res.permission.revokeTransactionHash ? 'Access revoked and recorded on the blockchain.' : 'Access revoked.');
       } catch (err) { UI.toast(err.message, 'error'); }
       render();
     });

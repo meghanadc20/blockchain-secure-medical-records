@@ -281,3 +281,23 @@ Audit logs are append-only (updates and deletes are blocked at the model level).
 | GET | `/api/audit/summary` | Patient | `{ last30Days: { doctorViews, deniedAttempts, integrityChecks }, tamperAlerts }` |
 
 Doctors and admins have no access to patients' audit trails (`403`).
+
+---
+
+## Time-limited access (Module 7)
+
+Each permission tracks **doctor, patient, record, grant time and expiry time**; the expiry is stored identically (to the second) in MongoDB and in the contract.
+Access ends at `expiresAt` on **both** layers independently: MongoDB is checked against the server clock (permission marked `EXPIRED`, audited `ACCESS_EXPIRED`), and the contract's `hasAccess()` against block time.
+Shares can last 5 minutes to 1 year (UI presets: 15 min, 1 h, 24 h, 7 days, 30 days, custom).
+
+Permission views now include `secondsRemaining` and `expiringSoon` (active and ending within 24 h); list responses include `serverTime` so the browser's countdowns follow the server clock.
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET | `/api/permissions?status=ACTIVE\|EXPIRING\|EXPIRED\|REVOKED` | Patient | `EXPIRING` = active and ending within 24 h |
+| GET | `/api/permissions/doctor?status=…` | Verified doctor | Same filters |
+| GET | `/api/permissions/summary` | Patient | `{ active, expiringSoon, nextExpiry, serverTime }` |
+| GET | `/api/permissions/doctor/summary` | Verified doctor | Same shape |
+
+Revoking a grant that has already expired returns `409 PERMISSION_EXPIRED` (and marks it `EXPIRED`).
+**Changing an expiry** is two patient-signed transactions — revoke the current grant, then grant again with the new expiry — because the contract never rewrites an active grant.

@@ -8,7 +8,9 @@ const { ROLES } = require('../utils/constants');
 const router = Router();
 router.use(authenticate);
 
+router.get('/doctor/summary', requireVerifiedDoctor, ctrl.summary('doctor'));
 router.get('/doctor', requireVerifiedDoctor, ctrl.listForDoctor);
+router.get('/summary', authorize(ROLES.PATIENT), ctrl.summary('patient'));
 router.get('/', authorize(ROLES.PATIENT), ctrl.listForPatient);
 router.post('/prepare', authorize(ROLES.PATIENT), ctrl.prepareGrant);
 router.post('/', authorize(ROLES.PATIENT), ctrl.grant);

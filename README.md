@@ -45,6 +45,6 @@ npm run dev               # http://localhost:5000
 - [x] Phase 7 — Module 4: Sharing & Access Control
 - [x] Phase 8 — Module 5: Blockchain & Smart Contract
 - [x] Phase 9 — Module 6: Integrity & Audit
-- [ ] Phase 10 — Module 7: Time-limited access
+- [x] Phase 10 — Module 7: Time-limited access
 - [ ] Phase 11 — Testing
 - [ ] Phase 12 — Final integration
