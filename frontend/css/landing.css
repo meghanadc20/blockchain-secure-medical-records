@@ -5,7 +5,7 @@
 .hero .lead { font-size: 1.12rem; color: var(--text-muted); max-width: 560px; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 .hero-panel { padding: 20px; }
-.flow-step { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px dashed var(--border); }
+.flow-step { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px dashed var(--border); }
 .flow-step:last-child { border-bottom: none; }
 .flow-icon { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); }
 .flow-step strong { display: block; font-size: .95rem; }

@@ -14,7 +14,7 @@
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
 
-  <!-- Public navigation: Home, About, Login, Register as Patient, Register as Doctor. No admin entry points. -->
+  <!-- Public navigation: Home, About, Login (registration buttons are in the hero). No admin entry points. -->
   <header class="topnav">
     <nav class="container" aria-label="Main">
       <a class="brand" href="/">
@@ -30,8 +30,6 @@
         <li><a href="/">Home</a></li>
         <li><a href="#about">About</a></li>
         <li><a href="/login">Login</a></li>
-        <li><a href="/register/patient">Register as Patient</a></li>
-        <li><a class="btn btn-primary btn-sm" href="/register/doctor">Register as Doctor</a></li>
       </ul>
     </nav>
   </header>
@@ -51,19 +49,19 @@
         <div class="card hero-panel" aria-label="How access works">
           <div class="flow-step">
             <div class="flow-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg></div>
-            <div><strong>Patient uploads a record</strong><span>Encrypted file stored off-chain; SHA-256 fingerprint recorded.</span></div>
+            <div><strong>Patient uploads a record</strong></div>
           </div>
           <div class="flow-step">
             <div class="flow-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6"/><path d="M16 11l2 2 4-4"/></svg></div>
-            <div><strong>Verified doctor requests access</strong><span>Only admin-verified doctors can request.</span></div>
+            <div><strong>Verified doctor requests access</strong></div>
           </div>
           <div class="flow-step">
             <div class="flow-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-            <div><strong>Patient grants time-limited access</strong><span>Per record, with an expiry; revocable at any time.</span></div>
+            <div><strong>Patient grants time-limited access</strong></div>
           </div>
           <div class="flow-step">
             <div class="flow-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
-            <div><strong>Every view is checked and logged</strong><span>Permission check, integrity check, audit entry.</span></div>
+            <div><strong>Every view is checked and logged</strong></div>
           </div>
         </div>
       </div>
