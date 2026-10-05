@@ -187,9 +187,9 @@ Fields: `file` (PDF/JPEG/PNG, ≤10 MB — the real content is checked by magic 
 → `201 { record }` · `400 FILE_REQUIRED | UNSUPPORTED_FILE_TYPE | FILE_CONTENT_MISMATCH | VALIDATION_ERROR | INVALID_UPLOAD` · `413 FILE_TOO_LARGE` · `403 PERMISSION_DENIED | DOCTOR_NOT_VERIFIED` · `502 STORAGE_ERROR`. Audited `RECORD_UPLOAD` (type and size only — no file name or content).
 
 ### `GET /api/records/:recordId/file?disposition=attachment|inline`
-Controlled retrieval: access check → download ciphertext → decrypt (the GCM auth tag rejects any modified ciphertext) → stream with `Cache-Control: no-store`.
+Controlled retrieval: access check → download ciphertext → decrypt (the GCM auth tag rejects any modified ciphertext) → **SHA-256 integrity check against the on-chain fingerprint (Module 6)** → stream with `Cache-Control: no-store`. Tampered files are never delivered (`409 TAMPER_DETECTED`).
 - Owning patient: allowed. Other patients: `404`. Doctors: only with a live record permission (see Module 4) — otherwise `403 PERMISSION_DENIED | PERMISSION_EXPIRED | PERMISSION_REVOKED | DOCTOR_NOT_VERIFIED`. Admins: `403`.
-- `404 FILE_NOT_FOUND` if the record has no file or the object is missing · `409 FILE_INTEGRITY_FAILED` if the stored ciphertext was altered (audited `TAMPER_DETECTED`) · `502 STORAGE_ERROR`.
+- `404 FILE_NOT_FOUND` if the record has no file or the object is missing · `409 TAMPER_DETECTED` if the ciphertext, the file content or the stored hash was altered (audited) · `502 STORAGE_ERROR`.
 - Successful reads audited `RECORD_VIEW` (`metadata.type = FILE`).
 
 ### Storage setup
@@ -245,3 +245,39 @@ See [BLOCKCHAIN.md](BLOCKCHAIN.md) for the contract and flows.
 Upload responses include `anchoring: 'ANCHORED' | 'PENDING'`; records carry `blockchainTransactionHash` once anchored (audited `RECORD_HASH_ANCHORED`).
 Doctor reads additionally fail with `403 PERMISSION_NOT_ON_CHAIN`, `403 BLOCKCHAIN_PERMISSION_DENIED` or `503 BLOCKCHAIN_UNAVAILABLE`.
 `GET /api/health` → `data.blockchain`: `{ configured, reachable, chainId, localTestNetwork, contractAddress, contractDeployed, signerIsOwner, blockNumber }`.
+
+---
+
+## Integrity verification (Module 6)
+
+```
+stored ciphertext → AES-256-GCM decrypt → retrieved original → SHA-256 → currentHash
+currentHash == trusted hash (on-chain fingerprint anchored at upload)  → INTEGRITY_VERIFIED
+otherwise                                                              → TAMPER_DETECTED
+```
+Tampering is reported with a `stage`:
+- `DECRYPTION` — the encrypted object in storage was modified (GCM authentication tag mismatch);
+- `FILE_HASH` — the decrypted file's SHA-256 differs from the trusted fingerprint (e.g. an insider re-encrypted different content, even if they also rewrote the MongoDB hash);
+- `METADATA_HASH` — the file matches the chain, but the MongoDB copy of the hash was altered.
+
+If the record is not anchored yet, or the chain is unreachable, the MongoDB hash is used and the result says `trustedSource: "DATABASE"` with a `warning`.
+Hashing is a fingerprint, not encryption; encryption (AES-256-GCM) is separate.
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| POST | `/api/records/:recordId/verify` | Owning patient, or doctor with live access | `{ integrity: { status, algorithm, currentHash, storedHash, blockchainHash, trustedSource, anchorTransactionHash, stage?, reason?, warning?, checkedAt } }` |
+| GET | `/api/records/:recordId/file` | (as above) | Headers `X-Integrity-Status`, `X-Integrity-Source`, `X-File-SHA256` |
+
+Every check is audited `HASH_VERIFICATION` (`metadata.result`, `trustedSource`, `purpose: VERIFY | DOWNLOAD`); tampering also writes `TAMPER_DETECTED`.
+Record lists (`GET /api/records`, `GET /api/permissions/doctor`) include `lastIntegrityCheck: { status, trustedSource, checkedAt }`.
+
+## Audit trail (Module 6)
+
+Audit logs are append-only (updates and deletes are blocked at the model level).
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET | `/api/audit?category=&action=&recordId=&from=&to=&page=&limit=` | Patient | All events about the patient's data, newest first. `category`: `ACCESS`, `VIEWS`, `SECURITY`, `INTEGRITY`, `RECORDS`, `ACCOUNT`. Entry: `{ id, action, timestamp, actor: { role, name }, doctor, record: { id, title }, blockchainTransactionHash, details }` — IP addresses are not exposed and `details` is a safe whitelist |
+| GET | `/api/audit/summary` | Patient | `{ last30Days: { doctorViews, deniedAttempts, integrityChecks }, tamperAlerts }` |
+
+Doctors and admins have no access to patients' audit trails (`403`).

@@ -199,7 +199,10 @@
     async openFile(recordId, { inline = false } = {}) {
       const win = inline ? window.open('', '_blank') : null; // open synchronously to avoid popup blockers
       try {
-        const { blob, filename } = await API.blob(`/records/${recordId}/file${inline ? '?disposition=inline' : ''}`);
+        const { blob, filename, integrity } = await API.blob(`/records/${recordId}/file${inline ? '?disposition=inline' : ''}`);
+        if (integrity && integrity.status === 'INTEGRITY_VERIFIED') {
+          UI.toast(integrity.source === 'BLOCKCHAIN' ? 'INTEGRITY VERIFIED — file matches its on-chain SHA-256 fingerprint.' : 'INTEGRITY VERIFIED against the stored fingerprint (blockchain not available).', integrity.source === 'BLOCKCHAIN' ? 'success' : 'warning');
+        }
         const url = URL.createObjectURL(blob);
         if (win) { win.location.href = url; } else {
           const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
@@ -208,7 +211,54 @@
       } catch (err) {
         if (win) win.close();
         UI.toast(err.message, 'error');
+        throw err;
       }
+    },
+
+    /** Integrity badge from a check result ({ status, trustedSource, checkedAt }) or null. */
+    integrityBadge(check) {
+      if (!check || !check.status) return '<span class="badge badge-info" style="text-transform:none">Not checked yet</span>';
+      if (check.status === 'INTEGRITY_VERIFIED') {
+        return `<span class="badge badge-verified">Integrity verified</span><span class="cell-sub">${check.trustedSource === 'BLOCKCHAIN' ? 'against on-chain fingerprint' : 'against stored fingerprint'}${check.checkedAt ? ` · ${UI.formatDate(check.checkedAt, true)}` : ''}</span>`;
+      }
+      return `<span class="badge badge-tamper">Tamper detected</span>${check.checkedAt ? `<span class="cell-sub">${UI.formatDate(check.checkedAt, true)}</span>` : ''}`;
+    },
+
+    /** Runs POST /records/:id/verify and shows the comparison. Resolves to the result (or null on error). */
+    async verifyIntegrity(recordId, title) {
+      const dlg = UI.dialog({ title: `Integrity check — ${title || 'record'}`, bodyHtml: UI.state('loading', 'Downloading, decrypting and hashing the file…'), wide: true });
+      try {
+        const { integrity: v } = await API.post(`/records/${recordId}/verify`);
+        const ok = v.status === 'INTEGRITY_VERIFIED';
+        const mono = (h) => (h ? `<code style="word-break:break-all;font-size:.82rem">${UI.esc(h)}</code>` : '<span class="muted">—</span>');
+        const same = (a, b) => (a && b && a === b ? ' <span class="badge badge-verified" style="text-transform:none">match</span>' : (a && b ? ' <span class="badge badge-tamper" style="text-transform:none">differs</span>' : ''));
+        dlg.el.innerHTML = `
+          <div class="alert alert-${ok ? 'success' : 'error'}" role="status" style="font-size:1.05rem;font-weight:700;text-align:center;letter-spacing:.04em">${ok ? 'INTEGRITY VERIFIED' : 'TAMPER DETECTED'}</div>
+          ${v.reason ? `<p><strong>Reason:</strong> ${UI.esc(v.reason)}</p>` : ''}
+          ${v.warning ? `<div class="alert alert-warning">${UI.esc(v.warning)}</div>` : ''}
+          <dl class="kv">
+            <dt>Algorithm</dt><dd>${UI.esc(v.algorithm)} of the original (decrypted) file</dd>
+            <dt>Current file hash</dt><dd>${mono(v.currentHash)}</dd>
+            <dt>On-chain fingerprint</dt><dd>${mono(v.blockchainHash)}${same(v.currentHash, v.blockchainHash)}</dd>
+            <dt>Stored (MongoDB) hash</dt><dd>${mono(v.storedHash)}${same(v.currentHash, v.storedHash)}</dd>
+            <dt>Trusted reference</dt><dd>${v.trustedSource === 'BLOCKCHAIN' ? 'Blockchain (anchored at upload)' : 'Database copy'}</dd>
+            <dt>Anchor transaction</dt><dd>${v.anchorTransactionHash ? UI.chainBadge(v.anchorTransactionHash, 'Anchored') : '<span class="muted">Not anchored</span>'}</dd>
+            <dt>Checked</dt><dd>${UI.formatDate(v.checkedAt, true)}</dd>
+          </dl>
+          <p class="form-hint" style="margin-top:14px">Hashing creates a fingerprint; it does not encrypt. The file itself is encrypted separately (AES-256-GCM) in storage.</p>`;
+        return v;
+      } catch (err) {
+        dlg.el.innerHTML = UI.state('error', 'Integrity check could not run', err.message);
+        return null;
+      }
+    },
+
+    AUDIT_LABELS: {
+      REGISTER: 'Account created', LOGIN: 'Signed in', LOGIN_FAILED: 'Failed sign-in', LOGOUT: 'Signed out', PROFILE_UPDATED: 'Profile updated',
+      WALLET_LINKED: 'Wallet linked', RECORD_UPLOAD: 'Record uploaded', RECORD_UPDATED: 'Record details edited', RECORD_HASH_ANCHORED: 'Fingerprint anchored on blockchain',
+      CONSULTATION_ADDED: 'Consultation added', ACCESS_REQUEST: 'Doctor requested access', ACCESS_GRANTED: 'Access granted', ACCESS_REJECTED: 'Access rejected',
+      ACCESS_REVOKED: 'Access revoked', ACCESS_EXPIRED: 'Access expired', ACCESS_DENIED: 'Access denied', RECORD_VIEW: 'Record viewed',
+      HASH_VERIFICATION: 'Integrity check', TAMPER_DETECTED: 'TAMPER DETECTED', DOCTOR_APPROVED: 'Doctor approved', DOCTOR_REJECTED: 'Doctor rejected', EMERGENCY_ACCESS: 'Emergency access',
     },
 
     /** Client-side pre-check (the server re-checks type, real content and size). */

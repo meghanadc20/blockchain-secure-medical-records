@@ -192,7 +192,7 @@ describe('Phase 6 — Module 3: encrypted off-chain storage (real Supabase)', ()
     assert.equal(data.length, 0, 'object was deleted from storage');
   });
 
-  it('a modified ciphertext in storage is refused (FILE_INTEGRITY_FAILED, audited TAMPER_DETECTED)', async () => {
+  it('a modified ciphertext in storage is refused (TAMPER_DETECTED, audited)', async () => {
     const r0 = await uploadAs(srv.url, t.patient, { fields: { title: 'To be tampered' } });
     const db = await M.MedicalRecord.findById(r0.body.data.record.id).lean();
     const { data } = await getSupabase().storage.from(BUCKET).download(db.storagePath);
@@ -202,7 +202,7 @@ describe('Phase 6 — Module 3: encrypted off-chain storage (real Supabase)', ()
     assert.equal(up.error, null);
     const r = await fetchFile(srv.url, t.patient, db._id);
     assert.equal(r.status, 409);
-    assert.equal(r.json().error.code, 'FILE_INTEGRITY_FAILED');
+    assert.equal(r.json().error.code, 'TAMPER_DETECTED');
     assert.ok(await M.AuditLog.exists({ action: 'TAMPER_DETECTED', recordId: db._id }));
   });
 

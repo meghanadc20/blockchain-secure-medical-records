@@ -14,12 +14,23 @@
 <body data-role="PATIENT" data-page="audit" data-title="Audit Trail">
   <div id="app-root"><div class="app-loading"><div class="state" role="status"><div class="spinner" aria-hidden="true"></div>Loading…</div></div></div>
   <template id="page-content">
-    <div class="page-header"><div><h1>Audit Trail</h1><p>Who accessed your records, and when.</p></div></div>
-    <div class="card"><div class="state"><div class="state-title">Not available yet</div><div>This section is delivered with Module 6 (integrity and audit). Nothing is shown here until it is built.</div></div></div>
+    <div class="page-header"><div><h1>Audit trail</h1><p>Every action involving your data: uploads, sharing, doctor views, denied attempts and integrity checks. Entries are permanent and cannot be edited or deleted.</p></div></div>
+    <div class="grid grid-4" id="summary" style="margin-bottom:20px"></div>
+    <form id="filters" class="card toolbar" style="padding:16px" method="get" action="#" novalidate>
+      <div class="form-group" style="margin:0"><label for="category">Show</label><select class="form-control" id="category" name="category">
+        <option value="">All events</option><option value="ACCESS">Access & sharing</option><option value="VIEWS">Record views</option>
+        <option value="SECURITY">Denied attempts & tampering</option><option value="INTEGRITY">Integrity & blockchain</option>
+        <option value="RECORDS">Records & consultations</option><option value="ACCOUNT">Account</option></select></div>
+      <div class="form-group" style="margin:0"><label for="from">From</label><input class="form-control" id="from" name="from" type="date"></div>
+      <div class="form-group" style="margin:0"><label for="to">To</label><input class="form-control" id="to" name="to" type="date"></div>
+      <div style="display:flex;gap:8px;align-self:flex-end"><button class="btn btn-primary" type="submit">Apply</button><button class="btn btn-outline" type="reset">Clear</button></div>
+    </form>
+    <div id="list" style="margin-top:16px"></div>
+    <div class="pager" id="pager"></div>
   </template>
   <script src="/js/api.js" defer></script>
   <script src="/js/ui.js" defer></script>
   <script src="/js/layout.js" defer></script>
-
+  <script src="/js/pages/audit.js" defer></script>
 </body>
 </html>

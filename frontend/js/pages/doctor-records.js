@@ -32,8 +32,9 @@ Layout.ready.then(({ user }) => {
         { label: 'Granted', render: (p) => UI.formatDate(p.grantedAt, true) },
         { label: 'Expires', render: (p) => `${UI.formatDate(p.expiresAt, true)}<span class="cell-sub">${p.status === 'ACTIVE' ? UI.relativeTime(p.expiresAt) : ''}</span>` },
         { label: 'Status', render: (p) => `${UI.badge(p.status)}<div style="margin-top:4px">${UI.chainBadge(p.blockchainTransactionHash, 'Grant')}</div>` },
+        { label: 'Integrity', render: (p) => UI.integrityBadge(p.record.lastIntegrityCheck) },
         { label: 'Actions', render: (p) => (p.status === 'ACTIVE' && p.record.hasFile
-          ? `<div class="actions"><button class="btn btn-primary btn-sm" data-view="${p.record.id}">View</button><button class="btn btn-outline btn-sm" data-download="${p.record.id}">Download</button></div>`
+          ? `<div class="actions"><button class="btn btn-primary btn-sm" data-view="${p.record.id}">View</button><button class="btn btn-outline btn-sm" data-download="${p.record.id}">Download</button><button class="btn btn-outline btn-sm" data-verify="${p.record.id}" data-title="${UI.esc(p.record.title)}">Verify</button></div>`
           : '<span class="muted">—</span>') },
       ], data.items, { caption: `${current} shared records` });
     } catch (err) {
@@ -42,9 +43,11 @@ Layout.ready.then(({ user }) => {
   }
 
   listEl.addEventListener('click', async (e) => {
+    const ver = e.target.closest('[data-verify]');
+    if (ver) { await UI.verifyIntegrity(ver.dataset.verify, ver.dataset.title); load(); return; }
     const v = e.target.closest('[data-view]'); const d = e.target.closest('[data-download]');
     if (!v && !d) return;
-    await UI.openFile((v || d).dataset[v ? 'view' : 'download'], { inline: Boolean(v) });
+    try { await UI.openFile((v || d).dataset[v ? 'view' : 'download'], { inline: Boolean(v) }); } catch { /* toast shown */ }
     // If access expired/revoked meanwhile, the server refused it — refresh the lists.
     load(); counts();
   });

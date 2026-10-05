@@ -80,7 +80,11 @@
     }
     const cd = res.headers.get('content-disposition') || '';
     const m = /filename\*=UTF-8''([^;]+)/.exec(cd) || /filename="([^"]+)"/.exec(cd);
-    return { blob: await res.blob(), filename: m ? decodeURIComponent(m[1]) : 'medical-record' };
+    return {
+      blob: await res.blob(),
+      filename: m ? decodeURIComponent(m[1]) : 'medical-record',
+      integrity: { status: res.headers.get('X-Integrity-Status'), source: res.headers.get('X-Integrity-Source'), sha256: res.headers.get('X-File-SHA256') },
+    };
   }
 
   window.API = {

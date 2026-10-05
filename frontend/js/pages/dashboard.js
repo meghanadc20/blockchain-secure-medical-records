@@ -52,6 +52,14 @@ Layout.ready.then(async ({ user }) => {
       statsEl.innerHTML = UI.state('error', 'Could not load summary', err.message);
       pendingEl.innerHTML = '';
     }
+    const actEl = document.getElementById('activity');
+    try {
+      const [act, sum] = await Promise.all([API.get('/audit?limit=6&category=VIEWS'), API.get('/audit/summary')]);
+      const alert = sum.tamperAlerts ? `<div class="alert alert-error">${sum.tamperAlerts} tamper alert(s) recorded — see the audit trail.</div>` : '';
+      actEl.innerHTML = alert + (act.items.length
+        ? `<ul style="list-style:none;padding:0;margin:0">${act.items.map((i) => `<li style="padding:8px 0;border-bottom:1px solid var(--border)"><strong>${i.actor.role === 'DOCTOR' ? `Dr. ${UI.esc(i.actor.name)}` : 'You'}</strong> opened <strong>${UI.esc((i.record && i.record.title) || 'a record')}</strong><span class="cell-sub">${UI.formatDate(i.timestamp, true)} · ${i.details.integrity === 'INTEGRITY_VERIFIED' ? 'integrity verified' : ''}</span></li>`).join('')}</ul>`
+        : UI.state('empty', 'No record views yet', 'When you or a doctor opens one of your records, it appears here.'));
+    } catch (err) { actEl.innerHTML = UI.state('error', 'Could not load activity', err.message); }
   }
 
   document.getElementById('account').innerHTML = rows.map(([k, v]) => `<dt>${UI.esc(k)}</dt><dd>${UI.esc(v)}</dd>`).join('');

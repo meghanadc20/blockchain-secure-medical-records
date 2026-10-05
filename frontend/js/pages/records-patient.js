@@ -53,10 +53,10 @@ Layout.ready.then(() => {
         <dt>File</dt><dd>${r.hasFile ? `${UI.esc(r.fileName || 'Stored file')} · ${UI.formatBytes(r.fileSize)} · <span class="badge badge-verified" style="text-transform:none">Encrypted at rest</span>` : '<span class="muted">No file attached</span>'}</dd>
         <dt>Access</dt><dd>${r.activeShares ? `<span class="badge badge-active" style="text-transform:none">${r.activeShares} doctor${r.activeShares > 1 ? 's' : ''} with active access</span>` : '<span class="muted">Not shared</span>'}</dd>
         <dt>Blockchain</dt><dd>${r.blockchainTransactionHash ? UI.chainBadge(r.blockchainTransactionHash, 'Fingerprint anchored') : (r.hasFile ? '<span class="badge badge-pending" style="text-transform:none">Anchoring pending</span>' : '<span class="muted">—</span>')}</dd>
-        <dt>Integrity</dt><dd><span class="muted">Not yet verified (Module 6)</span></dd>
+        <dt>Integrity</dt><dd>${r.hasFile ? UI.integrityBadge(r.lastIntegrityCheck) : '<span class="muted">—</span>'}</dd>
       </dl>
       <div class="actions">
-        ${r.hasFile ? `<button class="btn btn-primary btn-sm" data-view="${r.id}">View</button><button class="btn btn-outline btn-sm" data-download="${r.id}">Download</button>` : ''}
+        ${r.hasFile ? `<button class="btn btn-primary btn-sm" data-view="${r.id}">View</button><button class="btn btn-outline btn-sm" data-download="${r.id}">Download</button><button class="btn btn-outline btn-sm" data-verify="${r.id}">Verify integrity</button>` : ''}
         <button class="btn btn-secondary btn-sm" data-share="${r.id}">Share</button>
         <button class="btn btn-outline btn-sm" data-access="${r.id}">Manage access</button>
         <button class="btn btn-outline btn-sm" data-edit="${r.id}">Edit details</button>
@@ -81,9 +81,15 @@ Layout.ready.then(() => {
 
   listEl.addEventListener('click', async (e) => {
     const view = e.target.closest('[data-view]');
-    if (view) { UI.openFile(view.dataset.view, { inline: true }); return; }
+    if (view) { UI.openFile(view.dataset.view, { inline: true }).catch(() => {}).finally(load); return; }
     const dl = e.target.closest('[data-download]');
-    if (dl) { UI.setLoading(dl, true, 'Decrypting…'); await UI.openFile(dl.dataset.download); UI.setLoading(dl, false); return; }
+    if (dl) {
+      UI.setLoading(dl, true, 'Decrypting & verifying…');
+      try { await UI.openFile(dl.dataset.download); } catch { /* toast shown */ } finally { UI.setLoading(dl, false); load(); }
+      return;
+    }
+    const ver = e.target.closest('[data-verify]');
+    if (ver) { const r = items.find((x) => x.id === ver.dataset.verify); await UI.verifyIntegrity(r.id, r.title); load(); return; }
     const share = e.target.closest('[data-share]');
     if (share) { shareRecord(items.find((x) => x.id === share.dataset.share)); return; }
     const acc = e.target.closest('[data-access]');

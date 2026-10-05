@@ -44,7 +44,11 @@ async function listOwn(req, res) {
     { $group: { _id: '$recordId', n: { $sum: 1 } } },
   ]);
   const counts = new Map(active.map((a) => [String(a._id), a.n]));
-  res.json({ success: true, data: paginated(items.map((r) => ({ ...toRecordView(r), activeShares: counts.get(String(r._id)) || 0 })), total, pg) });
+  const { latestIntegrityChecks } = require('../services/integrityStatus.service');
+  const checks = await latestIntegrityChecks(items.map((r) => r._id));
+  res.json({ success: true, data: paginated(items.map((r) => ({
+    ...toRecordView(r), activeShares: counts.get(String(r._id)) || 0, lastIntegrityCheck: checks.get(String(r._id)) || null,
+  })), total, pg) });
 }
 
 /** GET /api/records/:recordId — metadata: owning patient, or a doctor with a live permission. */
@@ -193,26 +197,25 @@ async function upload(req, res) {
 
 /**
  * GET /api/records/:recordId/file?disposition=inline|attachment
- * Controlled retrieval: access check → download ciphertext → decrypt (GCM auth tag verifies it) → stream.
+ * Controlled retrieval: access check → download ciphertext → decrypt → SHA-256 → compare with the
+ * on-chain fingerprint. Only a verified file is delivered; tampering → 409 TAMPER_DETECTED.
+ * Response headers report the result (X-Integrity-Status, X-Integrity-Source, X-File-SHA256).
  */
 async function downloadFile(req, res) {
   const { record: rec } = await loadReadableRecord(req, req.params.recordId);
   if (!rec.storagePath) throw ApiError.notFound('This record has no file attached.', 'FILE_NOT_FOUND');
 
-  const encrypted = await storage.download(rec.storagePath);
-  let plain;
-  try {
-    plain = decryptBuffer(encrypted, rec.encryptionIv, rec.encryptionAuthTag);
-  } catch (err) {
-    if (err.code === 'FILE_INTEGRITY_FAILED') {
-      await logAudit({ req, action: 'TAMPER_DETECTED', recordId: rec._id, patientId: rec.patientId, metadata: { stage: 'DECRYPTION', reason: 'AUTH_TAG_MISMATCH' } });
-    }
-    throw err;
+  const { verifyRecordFile } = require('../services/integrity.service');
+  const { plain, result } = await verifyRecordFile(req, rec, { purpose: 'DOWNLOAD' });
+  if (!plain) {
+    throw new ApiError(409, 'TAMPER DETECTED: this file failed its integrity check and was not delivered.', 'TAMPER_DETECTED', [
+      { field: 'integrity', message: result.reason }, { field: 'stage', message: result.stage },
+    ]);
   }
 
   await logAudit({
     req, action: 'RECORD_VIEW', recordId: rec._id, patientId: rec.patientId,
-    ...(req.user.role === R.DOCTOR ? { doctorId: req.user._id } : {}), metadata: { type: 'FILE' },
+    ...(req.user.role === R.DOCTOR ? { doctorId: req.user._id } : {}), metadata: { type: 'FILE', integrity: result.status, trustedSource: result.trustedSource },
   });
 
   const disposition = req.query.disposition === 'inline' ? 'inline' : 'attachment';
@@ -222,8 +225,25 @@ async function downloadFile(req, res) {
   res.setHeader('Content-Disposition', `${disposition}; filename="${name.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(name)}`);
   res.setHeader('Cache-Control', 'no-store, private');
   res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox");
+  res.setHeader('X-Integrity-Status', result.status);
+  res.setHeader('X-Integrity-Source', result.trustedSource);
+  res.setHeader('X-File-SHA256', result.currentHash);
+  res.setHeader('Access-Control-Expose-Headers', 'X-Integrity-Status, X-Integrity-Source, X-File-SHA256, Content-Disposition');
   res.end(plain);
+}
+
+/**
+ * POST /api/records/:recordId/verify — run the integrity check without downloading.
+ * Returns { status: INTEGRITY_VERIFIED | TAMPER_DETECTED, currentHash, storedHash, blockchainHash, trustedSource, ... }.
+ */
+async function verifyIntegrity(req, res) {
+  const { record: rec } = await loadReadableRecord(req, req.params.recordId);
+  if (!rec.storagePath) throw ApiError.notFound('This record has no file attached.', 'FILE_NOT_FOUND');
+  const { verifyRecordFile } = require('../services/integrity.service');
+  const { result } = await verifyRecordFile(req, rec, { purpose: 'VERIFY' });
+  res.json({ success: true, data: { integrity: result } });
 }
 
 module.exports.upload = upload;
 module.exports.downloadFile = downloadFile;
+module.exports.verifyIntegrity = verifyIntegrity;

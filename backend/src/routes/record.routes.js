@@ -25,5 +25,6 @@ router.patch('/:recordId', authorize(ROLES.PATIENT), validateId('recordId'), ctr
 
 // Controlled file retrieval (access decided by recordAccess.service)
 router.get('/:recordId/file', patientOrVerifiedDoctor, validateId('recordId'), ctrl.downloadFile);
+router.post('/:recordId/verify', patientOrVerifiedDoctor, validateId('recordId'), ctrl.verifyIntegrity);
 
 module.exports = router;

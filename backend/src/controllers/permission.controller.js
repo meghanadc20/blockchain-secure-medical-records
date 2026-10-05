@@ -256,7 +256,13 @@ async function listForDoctor(req, res) {
     AccessPermission.countDocuments(filter),
   ]);
   const now = new Date();
-  res.json({ success: true, data: paginated(items.map((p) => toView(p, now)), total, pg) });
+  const { latestIntegrityChecks } = require('../services/integrityStatus.service');
+  const checks = await latestIntegrityChecks(items.map((p) => (p.recordId && p.recordId._id) || p.recordId));
+  res.json({ success: true, data: paginated(items.map((p) => {
+    const v = toView(p, now);
+    v.record.lastIntegrityCheck = checks.get(v.record.id) || null;
+    return v;
+  }), total, pg) });
 }
 
 module.exports = { prepareGrant, grant, prepareRevoke, revoke, listForPatient, listForDoctor, toView, requireLinkedWallet };
