@@ -1,0 +1,48 @@
+# Render Blueprint for the public MedChain demo (free plan, ₹0).
+# One web service serves both the Express API (/api/...) and the static frontend.
+# Secret values are NOT stored here (sync: false) — add them in the Render dashboard,
+# easiest with Environment → "Add from .env" using the git-ignored .env.render file
+# (generate it locally with: cd backend && npm run render:env). See docs/DEPLOYMENT.md.
+services:
+  - type: web
+    name: medchain
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: cd backend && npm ci --omit=dev
+    startCommand: cd backend && npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: CHAIN_ID
+        value: "11155111"
+      - key: MONGO_DB_NAME
+        value: medchain_demo
+      - key: SUPABASE_BUCKET
+        value: medical-records
+      - key: JWT_EXPIRES_IN
+        value: 1h
+      - key: TESTNET_WALLET_FUNDING_ETH
+        value: "0.005"
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: FILE_ENCRYPTION_KEY
+        sync: false
+      - key: BLOCKCHAIN_RPC_URL
+        sync: false
+      - key: CONTRACT_ADDRESS
+        sync: false
+      - key: PRIVATE_KEY
+        sync: false

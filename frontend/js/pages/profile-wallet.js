@@ -16,11 +16,12 @@ Layout.ready.then(async ({ user }) => {
   try {
     const cfg = await Wallet.config();
     render(user.walletAddress ? UI.esc(ethers.getAddress(user.walletAddress)) : null, [
-      ['Network', `Ganache local test network (chain id ${cfg.chainId})`],
+      ['Network', `${UI.esc(cfg.networkName || 'Test network')} (chain id ${UI.esc(cfg.chainId)})`],
       ['Contract', UI.esc(cfg.contractAddress)],
     ]);
+    document.querySelectorAll('.wallet-network-name').forEach((el) => { el.textContent = cfg.networkName || 'test network'; });
   } catch (err) {
-    UI.showAlert(alertEl, 'warning', `${err.message} Start the local chain with “npm run chain”.`);
+    UI.showAlert(alertEl, 'warning', `${err.message} (Local development: start the chain with “npm run chain”.)`);
   }
   if (!Wallet.available()) {
     UI.showAlert(alertEl, 'warning', 'MetaMask was not detected in this browser. Install the MetaMask extension, then reload this page.');
@@ -34,7 +35,7 @@ Layout.ready.then(async ({ user }) => {
       user.walletAddress = res.walletAddress.toLowerCase();
       API.Session.setUser(user);
       render(UI.esc(res.walletAddress), [['Registration transaction', UI.chainBadge(res.registrationTxHash, 'Registered')]]);
-      UI.showAlert(alertEl, 'success', `Wallet linked and registered on the blockchain.${res.testEtherFunded ? ' It received 1 test ETH for transaction fees (local test network only).' : ''}`);
+      UI.showAlert(alertEl, 'success', `Wallet linked and registered on the blockchain.${res.testEtherFunded ? ' It received some free test ETH for transaction fees (test network only — no real value).' : ''}`);
     } catch (err) {
       UI.showAlert(alertEl, 'error', err.message);
     } finally {

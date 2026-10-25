@@ -1,6 +1,7 @@
 'use strict';
 /**
- * Blockchain layer (Module 5) — Ethers.js v6 against the LOCAL Ganache chain.
+ * Blockchain layer (Module 5) — Ethers.js v6 against the local Ganache chain (development)
+ * or the Ethereum Sepolia TEST network (public demo deployment). Mainnet is never used.
  *
  * Only pseudonymous identifiers and SHA-256 fingerprints go on-chain:
  *   patientKey = keccak256("patient:<mongoId>"), doctorKey = keccak256("doctor:<mongoId>"),
@@ -15,8 +16,13 @@ const artifact = require('../blockchain/MedicalAccessControl.json');
 const ApiError = require('../utils/ApiError');
 
 const LOCAL_CHAIN_IDS = [1337, 31337];
-const CALL_TIMEOUT_MS = 8000;
-const TX_TIMEOUT_MS = 30000;
+const TESTNET_CHAIN_IDS = [11155111]; // Ethereum Sepolia (free test ether only)
+const NETWORK_NAMES = { 1337: 'Ganache (local test network)', 31337: 'Local test network', 11155111: 'Sepolia test network' };
+const isLocalChain = (id) => LOCAL_CHAIN_IDS.includes(Number(id));
+// A public testnet mines a block about every 12 s, so it needs far longer waits than Ganache.
+const timing = () => (isLocalChain(config().chainId)
+  ? { call: 8000, tx: 30000, poll: 250, status: 3000, receiptRetries: 0 }
+  : { call: 20000, tx: 180000, poll: 4000, status: 10000, receiptRetries: 6 });
 const iface = new Interface(artifact.abi);
 
 /* ------------------------------------------------------------------ config */
@@ -47,7 +53,7 @@ function clients() {
   const c = config();
   const key = `${c.rpcUrl}|${c.contractAddress}|${c.privateKey.slice(-6)}|${c.chainId}`;
   if (cache.key !== key) {
-    const provider = new JsonRpcProvider(c.rpcUrl, c.chainId, { staticNetwork: true, polling: true, pollingInterval: 250, cacheTimeout: -1 });
+    const provider = new JsonRpcProvider(c.rpcUrl, c.chainId, { staticNetwork: true, polling: true, pollingInterval: timing().poll, cacheTimeout: -1 });
     const signer = new Wallet(c.privateKey, provider);
     cache = {
       key,
@@ -109,7 +115,7 @@ async function status() {
     const { provider, contractAddress, chainId, read, signer } = clients();
     const [net, code, block, owner] = await withTimeout(Promise.all([
       provider.send('eth_chainId', []), provider.getCode(contractAddress), provider.getBlockNumber(), read.owner().catch(() => null),
-    ]), 3000, 'status');
+    ]), timing().status, 'status');
     const actualChainId = parseInt(net, 16);
     return {
       configured: true,
@@ -132,8 +138,8 @@ async function status() {
 async function sendOwnerTx(fnName, args) {
   try {
     const { write } = clients();
-    const tx = await withTimeout(write[fnName](...args), CALL_TIMEOUT_MS, fnName);
-    const receipt = await withTimeout(tx.wait(), TX_TIMEOUT_MS, `${fnName} confirmation`);
+    const tx = await withTimeout(write[fnName](...args), timing().call, fnName);
+    const receipt = await withTimeout(tx.wait(), timing().tx, `${fnName} confirmation`);
     if (!receipt || receipt.status !== 1) throw new ApiError(409, 'The blockchain transaction failed.', 'BLOCKCHAIN_REJECTED');
     return { txHash: receipt.hash, blockNumber: receipt.blockNumber };
   } catch (err) { throw mapError(err, fnName); }
@@ -151,17 +157,28 @@ async function registerRecord(recordId, patientId, sha256Hex) {
   return sendOwnerTx('registerRecord', [recordKey(recordId), patientKey(patientId), toBytes32Hash(sha256Hex)]);
 }
 
-/** Local test chain only: gives a newly linked patient wallet some TEST ether for gas. */
-async function fundTestWallet(address, { minimum = '0.5', amount = '1' } = {}) {
+/** Opt-in amount of Sepolia TEST ether to send a newly linked wallet ('' / 0 = off). */
+function testnetFundAmount() {
+  const v = String(process.env.TESTNET_WALLET_FUNDING_ETH || '').trim();
+  return /^\d*\.?\d+$/.test(v) && Number(v) > 0 && Number(v) <= 0.05 ? v : null;
+}
+
+/**
+ * Gives a newly linked patient wallet some TEST ether for gas: 1 ETH on the local chain, or
+ * (only if TESTNET_WALLET_FUNDING_ETH is set) a small amount on Sepolia. Never on any other chain.
+ */
+async function fundTestWallet(address, opts = {}) {
   try {
     const { provider, signer, chainId } = clients();
-    if (!LOCAL_CHAIN_IDS.includes(chainId)) return { funded: false, reason: 'not a local test chain' };
-    const actual = parseInt(await withTimeout(provider.send('eth_chainId', []), CALL_TIMEOUT_MS, 'chainId'), 16);
-    if (!LOCAL_CHAIN_IDS.includes(actual)) return { funded: false, reason: 'not a local test chain' };
-    const balance = await withTimeout(provider.getBalance(address), CALL_TIMEOUT_MS, 'balance');
+    const testnetAmount = TESTNET_CHAIN_IDS.includes(chainId) ? testnetFundAmount() : null;
+    if (!isLocalChain(chainId) && !testnetAmount) return { funded: false, reason: 'funding disabled on this network' };
+    const { minimum = testnetAmount || '0.5', amount = testnetAmount || '1' } = opts;
+    const actual = parseInt(await withTimeout(provider.send('eth_chainId', []), timing().call, 'chainId'), 16);
+    if (actual !== chainId) return { funded: false, reason: 'chain id mismatch' };
+    const balance = await withTimeout(provider.getBalance(address), timing().call, 'balance');
     if (balance >= parseEther(minimum)) return { funded: false, balance: formatEther(balance) };
-    const tx = await withTimeout(signer.sendTransaction({ to: getAddress(address), value: parseEther(amount) }), CALL_TIMEOUT_MS, 'fund');
-    const receipt = await withTimeout(tx.wait(), TX_TIMEOUT_MS, 'fund confirmation');
+    const tx = await withTimeout(signer.sendTransaction({ to: getAddress(address), value: parseEther(amount) }), timing().call, 'fund');
+    const receipt = await withTimeout(tx.wait(), timing().tx, 'fund confirmation');
     return { funded: true, amount, txHash: receipt.hash };
   } catch (err) { throw mapError(err, 'fundTestWallet'); }
 }
@@ -171,7 +188,7 @@ async function fundTestWallet(address, { minimum = '0.5', amount = '1' } = {}) {
 async function getRecord(recordId) {
   try {
     const { read } = clients();
-    const [pk, fileHash, registeredAt, exists] = await withTimeout(read.getRecord(recordKey(recordId)), CALL_TIMEOUT_MS, 'getRecord');
+    const [pk, fileHash, registeredAt, exists] = await withTimeout(read.getRecord(recordKey(recordId)), timing().call, 'getRecord');
     return { patientKey: pk, fileHash: exists ? fileHash.slice(2) : null, registeredAt: Number(registeredAt), exists };
   } catch (err) { throw mapError(err, 'getRecord'); }
 }
@@ -179,7 +196,7 @@ async function getRecord(recordId) {
 async function getPatientWallet(patientId) {
   try {
     const { read } = clients();
-    const w = await withTimeout(read.patientWallets(patientKey(patientId)), CALL_TIMEOUT_MS, 'patientWallets');
+    const w = await withTimeout(read.patientWallets(patientKey(patientId)), timing().call, 'patientWallets');
     return w === '0x0000000000000000000000000000000000000000' ? null : getAddress(w);
   } catch (err) { throw mapError(err, 'patientWallets'); }
 }
@@ -188,14 +205,14 @@ async function getPatientWallet(patientId) {
 async function hasAccess(recordId, doctorId) {
   try {
     const { read } = clients();
-    return await withTimeout(read.hasAccess(recordKey(recordId), doctorKey(doctorId)), CALL_TIMEOUT_MS, 'hasAccess');
+    return await withTimeout(read.hasAccess(recordKey(recordId), doctorKey(doctorId)), timing().call, 'hasAccess');
   } catch (err) { throw mapError(err, 'hasAccess'); }
 }
 
 async function getGrant(recordId, doctorId) {
   try {
     const { read } = clients();
-    const [grantedAt, expiresAt, revokedAt, epoch, exists] = await withTimeout(read.getGrant(recordKey(recordId), doctorKey(doctorId)), CALL_TIMEOUT_MS, 'getGrant');
+    const [grantedAt, expiresAt, revokedAt, epoch, exists] = await withTimeout(read.getGrant(recordKey(recordId), doctorKey(doctorId)), timing().call, 'getGrant');
     return { grantedAt: Number(grantedAt), expiresAt: Number(expiresAt), revokedAt: Number(revokedAt), epoch: Number(epoch), exists };
   } catch (err) { throw mapError(err, 'getGrant'); }
 }
@@ -214,7 +231,12 @@ async function loadVerifiedReceipt(txHash, expectedFrom) {
   let receipt; let tx;
   try {
     const { provider } = clients();
-    [receipt, tx] = await withTimeout(Promise.all([provider.getTransactionReceipt(txHash), provider.getTransaction(txHash)]), CALL_TIMEOUT_MS, 'receipt');
+    // On a public testnet our RPC node can be a block behind MetaMask's, so retry briefly.
+    for (let attempt = 0; ; attempt += 1) {
+      [receipt, tx] = await withTimeout(Promise.all([provider.getTransactionReceipt(txHash), provider.getTransaction(txHash)]), timing().call, 'receipt');
+      if ((receipt && tx) || attempt >= timing().receiptRetries) break;
+      await new Promise((r) => setTimeout(r, 3000));
+    }
   } catch (err) { throw mapError(err, 'receipt'); }
   const { contractAddress } = clients();
   if (!receipt || !tx) throw rejected('Transaction not found on the blockchain.');
@@ -259,14 +281,23 @@ async function verifyDoctorRevokeTx(txHash, { patientId, doctorId, wallet }) {
   return { txHash: receipt.hash, blockNumber: receipt.blockNumber, epoch: Number(ev.args.newEpoch) };
 }
 
-/** Public info the browser needs to build patient transactions (no secrets). */
+/**
+ * Public info the browser needs to build patient transactions (no secrets).
+ * The RPC URL is only shared for a local chain: a hosted RPC URL (e.g. Alchemy) contains an
+ * API key, and MetaMask already knows how to reach Sepolia on its own.
+ */
 function publicConfig() {
   const { contractAddress, chainId } = clients();
-  return { contractAddress, chainId, rpcUrl: config().rpcUrl, abi: artifact.abi };
+  const local = isLocalChain(chainId);
+  return {
+    contractAddress, chainId, abi: artifact.abi,
+    networkName: NETWORK_NAMES[chainId] || `Test network (chain id ${chainId})`,
+    ...(local ? { rpcUrl: config().rpcUrl } : {}),
+  };
 }
 
 module.exports = {
-  LOCAL_CHAIN_IDS, revertData,
+  LOCAL_CHAIN_IDS, TESTNET_CHAIN_IDS, revertData,
   isConfigured, status, publicConfig,
   patientKey, doctorKey, recordKey, toBytes32Hash,
   registerPatientWallet, registerRecord, fundTestWallet,

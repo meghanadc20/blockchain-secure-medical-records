@@ -20,12 +20,12 @@ Medical files are **never** stored on the blockchain. The chain stores only pseu
 backend/      Express API (src/config, models, middleware, controllers, routes, services, utils)
 blockchain/   Solidity contract (scripts live in backend/scripts/chain)
 frontend/     Public pages + patient/, doctor/, admin/ dashboards
-docs/         API.md, BLOCKCHAIN.md, DATABASE.md, SETUP.md
+docs/         API.md, BLOCKCHAIN.md, DATABASE.md, SETUP.md, DEPLOYMENT.md
 ```
 
 ## Quick start
 
-See [docs/SETUP.md](docs/SETUP.md).
+See [docs/SETUP.md](docs/SETUP.md). Public demo deployment (Render + Sepolia, free): [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ```bash
 cp .env.example .env      # fill in values

@@ -13,7 +13,10 @@
     "storage:setup": "node scripts/setupStorage.js",
     "chain": "node scripts/chain/startChain.js",
     "chain:compile": "node scripts/chain/compile.js",
-    "chain:deploy": "node scripts/chain/deploy.js"
+    "chain:deploy": "node scripts/chain/deploy.js",
+    "chain:deploy:sepolia": "node scripts/chain/deploy.js --sepolia",
+    "chain:sepolia-wallet": "node scripts/chain/sepoliaWallet.js",
+    "render:env": "node scripts/renderEnv.js"
   },
   "engines": {
     "node": ">=22"

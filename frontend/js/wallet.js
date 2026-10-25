@@ -17,7 +17,7 @@
     if (code === 4001 || code === 'ACTION_REJECTED') return new WalletError('You cancelled the request in MetaMask.', 'USER_REJECTED');
     if (code === -32002) return new WalletError('MetaMask is already waiting for you — open the MetaMask window to continue.', 'PENDING_REQUEST');
     const msg = (err && (err.shortMessage || err.message)) || 'MetaMask request failed.';
-    if (/insufficient funds/i.test(msg)) return new WalletError('Your wallet has no test ether for gas. Re-link your wallet on the Profile page to receive local test ether.', 'INSUFFICIENT_FUNDS');
+    if (/insufficient funds/i.test(msg)) return new WalletError('Your wallet has no test ether for transaction fees. On Sepolia, get free test ether from a Sepolia faucet; on the local network, re-link your wallet on the Profile page.', 'INSUFFICIENT_FUNDS');
     return new WalletError(msg, 'WALLET_ERROR');
   }
 
@@ -29,7 +29,7 @@
       return cachedConfig;
     },
 
-    /** Asks MetaMask for an account and makes sure it is on the local Ganache network. */
+    /** Asks MetaMask for an account and makes sure it is on the configured test network. */
     async connect() {
       if (!Wallet.available()) throw new WalletError('MetaMask was not detected. Install the MetaMask extension and reload this page.', 'NO_WALLET');
       const cfg = await Wallet.config();
@@ -47,10 +47,11 @@
       try {
         await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: hexId }] });
       } catch (err) {
-        if (err && (err.code === 4902 || /Unrecognized chain/i.test(err.message || ''))) {
+        // Only a local chain can be added (Sepolia is built into MetaMask, and its hosted RPC URL is never sent to the browser).
+        if (err && cfg.rpcUrl && (err.code === 4902 || /Unrecognized chain/i.test(err.message || ''))) {
           await window.ethereum.request({
             method: 'wallet_addEthereumChain',
-            params: [{ chainId: hexId, chainName: 'Ganache (local test network)', rpcUrls: [cfg.rpcUrl], nativeCurrency: { name: 'Test Ether', symbol: 'ETH', decimals: 18 } }],
+            params: [{ chainId: hexId, chainName: cfg.networkName || 'Local test network', rpcUrls: [cfg.rpcUrl], nativeCurrency: { name: 'Test Ether', symbol: 'ETH', decimals: 18 } }],
           });
         } else throw err;
       }
